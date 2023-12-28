@@ -1,0 +1,11 @@
+
+mesh:
+  ext: [63, 63]
+  length: [2, 2]
+  origin: [-1, -1]
+  refine: 2
+
+fem:
+  integral: 3
+
+file: "./data/laplace_beltrami_63_63.npz"

@@ -78,10 +78,13 @@ class Unet(nn.Module):
         phi = self.btm(phi)
 
         phi = self.ctb4(phi, p4)
+        del p4
         phi = self.ctb3(phi, p3)
+        del p3
         phi = self.ctb2(phi, p2)
+        del p2
         phi = self.ctb1(phi, p1)
-
+        del p1
         phi = self.conv(phi)
 
         return phi
@@ -130,9 +133,9 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     NAME = "unet_100"
 
     if s_grad:
-        NAME += f"_s{int(s*100)}"
+        FULL_NAME = NAME + f"_s{int(s*100)}"
     else:
-        NAME += f"_s{int(s*100)}_no_grad"
+        FULL_NAME = NAME + f"_s{int(s*100)}_no_grad"
 
     print("Model built:")
     print(f"    {NAME}")
@@ -142,12 +145,12 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_model_size/checkpoints/{NAME}.pth", map_location=device))
+        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/{FULL_NAME}.pth", map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")
 
-    return model, NAME
+    return model, FULL_NAME
 
 
 if __name__ == "__main__":

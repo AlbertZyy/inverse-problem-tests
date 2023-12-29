@@ -142,9 +142,7 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     else:
         FULL_NAME = NAME + f"_s{int(s*100)}_no_grad"
 
-    print("Model built:")
-    print(f"    {NAME}")
-    print(f"in device: {device}")
+    print(f"Model built: {FULL_NAME}, in device: {device}")
 
     n_p = sum(p.numel() for p in model.unet.parameters())
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")

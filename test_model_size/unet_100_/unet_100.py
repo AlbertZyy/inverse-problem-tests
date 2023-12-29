@@ -137,15 +137,13 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     else:
         FULL_NAME = NAME + f"_s{int(s*100)}_no_grad"
 
-    print("Model built:")
-    print(f"    {NAME}")
-    print(f"in device: {device}")
+    print(f"Model built: {FULL_NAME}, in device: {device}")
 
     n_p = sum(p.numel() for p in model.unet.parameters())
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/{FULL_NAME}.pth", map_location=device))
+        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")

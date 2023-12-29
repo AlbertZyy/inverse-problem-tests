@@ -64,9 +64,9 @@ print(f'Total {n_epoch} epochs(start with {epoch_start}), {iter_per_epoch} itera
 print(f'Training set size: {len(train_dataset)}.')
 print(f'Validation set size: {len(validate_dataset)}.', end='\n\n')
 print("Train(SGD) setup:")
-print(f"  - learning rate: {config['lr']}")
-print(f"  - momentum: {config['momentum']}")
-print(f"  - weight decay: {config['weight_decay']}", end='\n\n')
+print(f"  - learning rate: {lr}")
+print(f"  - momentum: {momentum}")
+print(f"  - weight decay: {weight_decay}", end='\n\n')
 
 log_dir = config['log_dir']
 if log_dir[-1] != '/':
@@ -79,7 +79,7 @@ checkpoint_path = ''
 if SAVE:
     checkpoint_dir = config['checkpoint_dir']
 
-    if checkpoint_dir[-1]!= '/':
+    if checkpoint_dir[-1] != '/':
         checkpoint_dir += '/'
 
     checkpoint_path = checkpoint_dir + MODEL_NAME + '.pth'

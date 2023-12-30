@@ -139,3 +139,4 @@ for epoch in range(epoch_start, epoch_end):
     validate(epoch)
 
 writer_1.close()
+print("Done.")

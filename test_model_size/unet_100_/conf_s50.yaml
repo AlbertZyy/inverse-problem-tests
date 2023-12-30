@@ -9,11 +9,11 @@ data:
 
 gpu_id: 0
 
-s: 0.0
+s: 0.5
 s_grad: True
 
 epoch_start: 0
-epoch_end: 10
+epoch_end: 100
 
 lr: 0.001
 weight_decay: 0.000000001

@@ -1,6 +1,6 @@
 
 head: 0
-tail: 200
+tail: 10000
 
 data:
   sigma: [10., 1.]

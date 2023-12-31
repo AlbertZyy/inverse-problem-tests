@@ -3,8 +3,8 @@
 plot_type: 'line'
 
 csv_files:
-  - './plot_data/run-unet_100_s0_no_grad-tag-loss_train_.csv'
-  - './plot_data/run-unet_100_s0_no_grad-tag-loss_validate_.csv'
+  - './test_model_size/plot_data/run-unet_600_s0_no_grad-tag-loss_train_.csv'
+  - './test_model_size/plot_data/run-unet_600_s0_no_grad-tag-loss_validate_.csv'
 
 log: False
 smooth: 0.8
@@ -20,7 +20,7 @@ xlabel: 'iteration'
 ylabel: 'loss'
 
 xlim: 'auto'
-ylim: [0.0, 0.18]
+ylim: [0.0, 0.11]
 
 show: True
-save: './plot_data/loss_100_s0_no_grad.png'
+save: './test_model_size/plot_data/loss_600_s0_no_grad.png'

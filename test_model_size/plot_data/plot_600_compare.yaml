@@ -1,0 +1,28 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './test_model_size/plot_data/run-unet_600_s0_no_grad-tag-loss_validate_.csv'
+  - './test_model_size/plot_data/run-unet_600_s0-tag-loss_validate_.csv'
+  - './test_model_size/plot_data/run-unet_600_s50-tag-loss_validate_.csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - s no grad
+  - s 0.0
+  - s 0.5
+
+fig_name: 'loss'
+title: 'Validation Loss Comparison (smoothing 0.8)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.11]
+
+show: True
+save: './test_model_size/plot_data/loss_600_comp.png'

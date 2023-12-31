@@ -3,8 +3,8 @@
 plot_type: 'line'
 
 csv_files:
-  - './plot_data/run-unet_100_s50-tag-loss_train_.csv'
-  - './plot_data/run-unet_100_s50-tag-loss_validate_.csv'
+  - './test_model_size/plot_data/run-unet_100_s50-tag-loss_train_.csv'
+  - './test_model_size/plot_data/run-unet_100_s50-tag-loss_validate_.csv'
 
 log: False
 smooth: 0.8
@@ -23,4 +23,4 @@ xlim: 'auto'
 ylim: [0.0, 0.18]
 
 show: True
-save: './plot_data/loss_100_s50.png'
+save: './test_model_size/plot_data/loss_100_s50.png'

@@ -1,0 +1,24 @@
+
+data:
+  train_set_location: "./data/gdgn_64_64_train/"
+  train_set_volume: 10000
+  train_batch_size: 20
+  validate_set_location: "./data/gdgn_64_64_validate/"
+  validate_set_volume: 100
+  validate_batch_size: 20
+
+gpu_id: 0
+
+s: 0.0
+s_grad: True
+
+epoch_start: 0
+epoch_end: 100
+
+lr: 0.001
+weight_decay: 0.000000001
+momentum: 0.9
+
+log_dir: "./test_noise/noise_20_/logs/"
+save: True
+checkpoint_dir: "./test_noise/noise_20_/checkpoints/"

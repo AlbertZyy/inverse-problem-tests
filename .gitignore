@@ -144,3 +144,9 @@ data/
 
 # vscode
 .vscode/
+
+# PNG file
+*.png
+
+# CSV file
+*.csv

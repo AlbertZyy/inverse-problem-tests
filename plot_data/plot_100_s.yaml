@@ -1,0 +1,25 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './plot_data/run-unet_100_s0-tag-s.csv'
+  - './plot_data/run-unet_100_s50-tag-s.csv'
+
+log: False
+
+legends:
+  - unet 100, s 0.0
+  - unet 100, s 0.5
+
+fig_name: 'value of s'
+title: 'Value of s'
+
+xlabel: 'iteration'
+ylabel: 's'
+
+xlim: 'auto'
+ylim: [0.0, 0.5]
+
+show: True
+save: './plot_data/s_100.png'

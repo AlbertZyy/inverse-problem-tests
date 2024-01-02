@@ -148,7 +148,7 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/{FULL_NAME}.pth", map_location=device))
+        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")

@@ -9,7 +9,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import MSELoss, Module
 
-from unet_100 import build_model
+from unet_600 import build_model
 
 from dataset import NPZDataset
 
@@ -23,7 +23,7 @@ model_3.eval()
 
 validation_set = NPZDataset('./data/gdgn_64_64_validate/', 200)
 
-NO_EVALUATE = True
+NO_EVALUATE = False
 NO_PLOT = False
 save_dir = './test_model_size/plot_data/'
 
@@ -59,7 +59,7 @@ if not NO_PLOT:
 
     from matplotlib import pyplot as plt
 
-    ID = [62, 92, 12, 22]
+    ID = [62, 92, 12, 22, 185, 176, 153, 118]
 
     for i in ID:
         fig = plt.figure(f"validate - {i}", figsize=(7.5, 7.5))
@@ -78,6 +78,6 @@ if not NO_PLOT:
         axes.invert_yaxis()
         axes.set_title('label')
         fig.suptitle(f'validate - {i}')
-        fig.savefig(f'{save_dir}vis_100_{i}.png')
+        fig.savefig(f'{save_dir}vis_600_{i}.png')
 
     plt.show()

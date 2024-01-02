@@ -14,7 +14,7 @@ legends:
   - validation
 
 fig_name: 'loss'
-title: 'Loss (s fixed to 0, smoothing 0.8)'
+title: 'Loss (s_0 = 0.0, smoothing 0.8)'
 
 xlabel: 'iteration'
 ylabel: 'loss'

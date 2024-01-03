@@ -375,7 +375,7 @@ class LaplaceFDMSolver():
             if return_image:
                 return uh.reshape(self.indexing.shape)
             else:
-                return uh[:, 0]
+                return uh[0, :]
 
         else:
             n_channel = b__.shape[0]

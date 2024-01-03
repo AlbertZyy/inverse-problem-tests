@@ -192,18 +192,28 @@ class UniformPartition(Indexing):
 
     def dirichlet_source(self, gd: Tensor, *, out: Optional[Tensor]=None):
         """
-        *frequently used*.
+        @brief Apply dirichlet bc to source vector b. *frequently used*.
+
+        @param gd: Tensor. Dirichlet condition(s) in the shape of (N_bd, ) or (N_bd, C).
+        @param out: Tensor. Adding destination. A new Tensor will be created if `None`.
+
+        @return: Tensor. Dirichlet source vector in the shape of (N, ) or (N, C).
         """
         if out is None:
             dtype = self.dtype
             device = self.device
-            b = torch.zeros((self.NN, ), dtype=dtype, device=device)
+            if gd.ndim == 1:
+                b = torch.zeros((self.NN, ), dtype=dtype, device=device)
+            elif gd.ndim == 2:
+                b = torch.zeros((self.NN, gd.shape[-1]), dtype=dtype, device=device)
+            else:
+                raise ValueError(f"gd is expected to be 1-d or 2-d, but got {gd.ndim}-d.")
         else:
-            assert out.ndim == 1
+            assert out.ndim == gd.ndim
             b = out
 
         bd_node = self.boundary()
-        return b.index_add(dim=-1, index=bd_node, source=gd)
+        return b.index_add(dim=0, index=bd_node, source=gd)
 
     def neumann(self, A: Tensor):
         h = self.h
@@ -228,19 +238,32 @@ class UniformPartition(Indexing):
 
     def neumann_source(self, gn: Tensor, *, out: Optional[Tensor]=None):
         """
-        *frequently used*.
+        @brief Apply neumann bc to source vector b. *frequently used*.
+
+        @param gn: Tensor. Neumann condition(s) in the shape of (N_bd, ) or (N_bd, C).
+        @param out: Tensor. Adding destination. A new Tensor will be created if `None`.
+
+        @return: Tensor. Neumann source vector in the shape of (N, ) or (N, C).
         """
         if out is None:
             dtype = self.dtype
             device = self.device
-            b = torch.zeros((self.NN, ), dtype=dtype, device=device)
+            if gn.ndim == 1:
+                b = torch.zeros((self.NN, ), dtype=dtype, device=device)
+            elif gn.ndim == 2:
+                b = torch.zeros((self.NN, gn.shape[-1]), dtype=dtype, device=device)
+            else:
+                raise ValueError(f"gn is expected to be 1-d or 2-d, but got {gn.ndim}-d.")
         else:
-            assert out.ndim == 1
+            assert out.ndim == gn.ndim
             b = out
 
         bd_node = self.boundary()
-        gn = gn * self._neumann_source_scale()
-        return b.index_add(dim=-1, index=bd_node, source=gn)
+        if gn.ndim == 1:
+            gn = gn * self._neumann_source_scale()
+        else:
+            gn = gn * self._neumann_source_scale().unsqueeze(-1)
+        return b.index_add(dim=0, index=bd_node, source=gn)
 
     @enable_cache
     def _neumann_source_scale(self):

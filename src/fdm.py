@@ -194,10 +194,10 @@ class UniformPartition(Indexing):
         """
         @brief Apply dirichlet bc to source vector b. *frequently used*.
 
-        @param gd: Tensor. Dirichlet condition(s) in the shape of (N_bd, ) or (N_bd, C).
+        @param gd: Tensor. Dirichlet condition(s) in the shape of (N_bd, ) or (C, N_bd).
         @param out: Tensor. Adding destination. A new Tensor will be created if `None`.
 
-        @return: Tensor. Dirichlet source vector in the shape of (N, ) or (N, C).
+        @return: Tensor. Dirichlet source vector in the shape of (N, ) or (C, N).
         """
         if out is None:
             dtype = self.dtype
@@ -205,7 +205,7 @@ class UniformPartition(Indexing):
             if gd.ndim == 1:
                 b = torch.zeros((self.NN, ), dtype=dtype, device=device)
             elif gd.ndim == 2:
-                b = torch.zeros((self.NN, gd.shape[-1]), dtype=dtype, device=device)
+                b = torch.zeros((gd.shape[0], self.NN), dtype=dtype, device=device)
             else:
                 raise ValueError(f"gd is expected to be 1-d or 2-d, but got {gd.ndim}-d.")
         else:
@@ -213,7 +213,7 @@ class UniformPartition(Indexing):
             b = out
 
         bd_node = self.boundary()
-        return b.index_add(dim=0, index=bd_node, source=gd)
+        return b.index_add(dim=-1, index=bd_node, source=gd)
 
     def neumann(self, A: Tensor):
         h = self.h
@@ -240,10 +240,10 @@ class UniformPartition(Indexing):
         """
         @brief Apply neumann bc to source vector b. *frequently used*.
 
-        @param gn: Tensor. Neumann condition(s) in the shape of (N_bd, ) or (N_bd, C).
+        @param gn: Tensor. Neumann condition(s) in the shape of (N_bd, ) or (C, N_bd).
         @param out: Tensor. Adding destination. A new Tensor will be created if `None`.
 
-        @return: Tensor. Neumann source vector in the shape of (N, ) or (N, C).
+        @return: Tensor. Neumann source vector in the shape of (N, ) or (C, N).
         """
         if out is None:
             dtype = self.dtype
@@ -251,7 +251,7 @@ class UniformPartition(Indexing):
             if gn.ndim == 1:
                 b = torch.zeros((self.NN, ), dtype=dtype, device=device)
             elif gn.ndim == 2:
-                b = torch.zeros((self.NN, gn.shape[-1]), dtype=dtype, device=device)
+                b = torch.zeros((gn.shape[0], self.NN), dtype=dtype, device=device)
             else:
                 raise ValueError(f"gn is expected to be 1-d or 2-d, but got {gn.ndim}-d.")
         else:
@@ -262,8 +262,8 @@ class UniformPartition(Indexing):
         if gn.ndim == 1:
             gn = gn * self._neumann_source_scale()
         else:
-            gn = gn * self._neumann_source_scale().unsqueeze(-1)
-        return b.index_add(dim=0, index=bd_node, source=gn)
+            gn = gn * self._neumann_source_scale().unsqueeze(0)
+        return b.index_add(dim=-1, index=bd_node, source=gn)
 
     @enable_cache
     def _neumann_source_scale(self):
@@ -315,9 +315,9 @@ class LaplaceFDMSolver():
     def _init_gd(self):
         indexing = self.indexing
         A_d = indexing.diffusion_dirichlet()
-        self.A_d_LU, self.pivots_d = lu_factor(A_d)
+        self.A_d_LU, self.pivots_d = lu_factor(A_d.T)
 
-    def solve_from_gd(self, gd: Tensor, *, flatten=True) -> Tensor:
+    def solve_from_gd(self, gd: Tensor, *, return_image: bool=False) -> Tensor:
         """
         @brief Solve the Laplace equation from a dirichlet boundary data.
         """
@@ -326,13 +326,23 @@ class LaplaceFDMSolver():
 
         A_d_LU = self.A_d_LU
         pivots_d = self.pivots_d
-        b_ = self.indexing.dirichlet_source(gd)[:, None]
+        b_ = self.indexing.dirichlet_source(gd)
 
-        uh = lu_solve(A_d_LU, pivots_d, b_)
-        if flatten:
-            return uh[:, 0]
+        if b_.ndim == 1:
+            b_ = b_.unsqueeze(0)
+            uh = lu_solve(A_d_LU, pivots_d, b_, left=False)
+            if return_image:
+                return uh.reshape(self.indexing.shape)
+            else:
+                return uh[0, :]
+
         else:
-            return uh.reshape(self.indexing.shape)
+            n_channel = b_.shape[0]
+            uh = lu_solve(A_d_LU, pivots_d, b_, left=False)
+            if return_image:
+                return uh.reshape((n_channel, ) + self.indexing.shape)
+            else:
+                return uh
 
     def _init_gn(self):
         indexing = self.indexing
@@ -344,10 +354,9 @@ class LaplaceFDMSolver():
         A_n_c[-1, :-1] = c
         A_n_c[:-1, -1] = c
         A_n_c[-1, -1] = 0.
-        self.A_n_c = A_n_c
-        self.A_n_LU, self.pivots_n = lu_factor(A_n_c)
+        self.A_n_LU, self.pivots_n = lu_factor(A_n_c.T)
 
-    def solve_from_gn(self, gn: Tensor, *, flatten=True) -> Tensor:
+    def solve_from_gn(self, gn: Tensor, *, return_image: bool=False) -> Tensor:
         """
         @brief Solve the Laplace equation from a neumann boundary data.
         """
@@ -357,26 +366,51 @@ class LaplaceFDMSolver():
         A_n_LU = self.A_n_LU
         pivots_n = self.pivots_n
         b__ = self.indexing.neumann_source(gn)
-        ZERO_ = torch.zeros((1, ), dtype=self.dtype, device=self.device)
-        b_ = torch.cat([b__, ZERO_], dim=0)
-        b_.unsqueeze_(-1)
 
-        uh = lu_solve(A_n_LU, pivots_n, b_)[:-1]
-        if flatten:
-            return uh[:, 0]
+        if b__.ndim == 1:
+            b__ = b__.unsqueeze(0)
+            ZERO_ = torch.zeros((1, 1), dtype=self.dtype, device=self.device)
+            b_ = torch.cat([b__, ZERO_], dim=-1)
+            uh = lu_solve(A_n_LU, pivots_n, b_, left=False)[:, :-1]
+            if return_image:
+                return uh.reshape(self.indexing.shape)
+            else:
+                return uh[:, 0]
+
         else:
-            return uh.reshape(self.indexing.shape)
+            n_channel = b__.shape[0]
+            ZERO_ = torch.zeros((n_channel, 1), dtype=self.dtype, device=self.device)
+            b_ = torch.cat([b__, ZERO_], dim=-1)
+            uh = lu_solve(A_n_LU, pivots_n, b_, left=False)[:, :-1]
+            if return_image:
+                return uh.reshape((n_channel, ) + self.indexing.shape)
+            else:
+                return uh
 
     def normal_derivative(self, uh: Tensor):
         """
         @brief Calculates the directional derivative of the function along the\
                outer normal direction on the boundary.
+
+        @param uh: Tensor. In the shape of (N, ) or (C, N), where C is the number of\
+               channels and N is the number of nodes.
+
+        @return: Tensor. In the shape of (N_bd, ) or (C, N_bd), where N_bd is the\
+                 number of boundary nodes.
         """
+        assert uh.ndim in (1, 2)
         A = self.indexing.diffusion_neumann()
-        val = A @ uh.flatten()
+        val = uh @ A.T
         is_bd_node = self.indexing.boundary_flag()
-        val[is_bd_node] /= self.indexing._neumann_source_scale()
-        return val[is_bd_node]
+
+        if uh.ndim == 1:
+            val[is_bd_node] /= self.indexing._neumann_source_scale()
+            return val[is_bd_node]
+
+        else:
+            val[:, is_bd_node] /= self.indexing._neumann_source_scale().unsqueeze(0)
+            return val[:, is_bd_node]
+
 
     # def Solve_from_GD(self):
     #     """Construct a PyTorch Module to solve from gD."""

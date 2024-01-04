@@ -3,19 +3,22 @@ import sys
 sys.path.append("./src")
 
 import torch
-import numpy as np
 
 from fractional import MultiChannelFractional, Fractional
+from dataset import NPZDataset
+from common import add_gaussian_noise
 
-
-frac = MultiChannelFractional.from_npz(r"./data/laplace_beltrami_63_63.npz", n_channel=8)
-frac.set_initial_(slope=[0.25, ]*8, high_cut=[500., ]*8)
+# 2448.27
+frac = MultiChannelFractional.from_npz(r"./data/laplace_beltrami_63_63.npz", n_channel=8, hc_slope=5.)
+frac.set_initial_(slope=[0.5, ]*8, high_cut=[100, ]*8)
 frac.trainable_(False)
-print(frac.Vinv@frac.V)
 
-data = torch.randn(8, 252, dtype=torch.float64)
-alpha = frac.alpha(data)
-val = frac(data)
+dataset = NPZDataset(r"./data/gdgn_64_64_train", 100)
+gd = dataset[51][0][:, 0, :]
+# add_gaussian_noise(gd, 0., 0.1)
+alpha = frac.alpha(gd)
+
+val = frac(gd)
 alpha_2 = frac.alpha(val)
 
 

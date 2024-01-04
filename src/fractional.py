@@ -4,7 +4,7 @@ from typing import Dict, Optional, Callable, Sequence
 from numpy.typing import NDArray
 import torch
 from torch.nn import Parameter, Module
-from torch import Tensor, float64, device, relu, log
+from torch import Tensor, float64, device, relu
 
 
 class Fractional(Module):
@@ -100,7 +100,7 @@ class MultiChannelFractional(Module):
         assert w.ndim == 1
         assert V.ndim == 2
         self.s = Parameter(torch.zeros((n_channel, ), dtype=dtype, device=device))
-        self.hc = Parameter(torch.zeros((n_channel, ), dtype=dtype, device=device))
+        self.hc = Parameter(torch.ones((n_channel, ), dtype=dtype, device=device))
         self.hc_slope = Parameter(torch.tensor(hc_slope, dtype=dtype, device=device), requires_grad=False)
         self.w = Parameter(w.to(device=device, dtype=dtype), requires_grad=False)
         self.V = Parameter(V.to(device=device, dtype=dtype), requires_grad=False)
@@ -187,7 +187,7 @@ class MultiChannelFractional(Module):
     __call__: Callable[[Tensor], Tensor]
 
     def forward(self, multi_channel_uh: Tensor): # [n_channel, n_dof] -> [n_channel, n_dof]
-        return torch.einsum('cik, ck -> ci', self.matrix(), multi_channel_uh)
+        return torch.einsum('cik, ...ck -> ...ci', self.matrix(), multi_channel_uh)
 
     def alpha(self, multi_channel_uh: Tensor):
         """
@@ -195,4 +195,4 @@ class MultiChannelFractional(Module):
 
         @param multi_channel_uh: Tensor. [n_channel, n_dof]
         """
-        return torch.einsum('ik, ck -> ci', self.Vinv, multi_channel_uh)
+        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, multi_channel_uh)

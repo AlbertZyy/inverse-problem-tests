@@ -74,9 +74,21 @@ class MultiChannelDataFeature(Module):
 
     def forward(self, data: Tensor):
         assert data.ndim == 4
-        BATCH_CHANNEL = data.shape[0:2]
-        GDGN = data.shape[2:]
-        data = data.reshape(-1, *GDGN)
-        val = self.solve_phi(data)
+        assert data.shape[2] == 2
+        BATCH, CHANNEL, _, NNBD = data.shape
+
+        # NOTE: Merge the Batch and Channel axis to vectorize in the FDM solver.
+        data = data.reshape(-1, 2, NNBD) # [N*C, 2, NN_bd]
+        gd, gn = data[:, 0, :], data[:, 1, :] # [N*C, NN_bd]
+        vuh = self._solver.solve_from_gd(gd) # [N*C, NN]
+        vn = self._solver.normal_derivative(vuh) # [N*C, NN_bd]
+
+        # NOTE: Restore the Batch axis to send to the fractional.
+        gnvn = self._frac((gn - vn).reshape(BATCH, CHANNEL, NNBD)) # [N, C, NN_bd]
+
+        # NOTE: Merge the Batch and Channel axis again for the FDM solver.
+        val = self._solver.solve_from_gn(gnvn.reshape(-1, NNBD)) # [N*C, NN]
+
+        # NOTE: Return the result as a 4-d image.
         MESH = self._solver.indexing.shape
-        return val.reshape(BATCH_CHANNEL + MESH)
+        return val.reshape((BATCH, CHANNEL) + MESH)

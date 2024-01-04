@@ -282,6 +282,11 @@ class UniformPartition(Indexing):
     def coordinate(self, origin: Sequence[float]):
         """
         @brief Construct coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
+
+        @param origin: Sequence[float]. Origin of the coordinate system.\
+                Length of the sequence should be equal to the geometry dimension.
+
+        @return: Tensor. Coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
         """
         GD = self.GD
         assert GD == len(origin)
@@ -317,9 +322,17 @@ class LaplaceFDMSolver():
         A_d = indexing.diffusion_dirichlet()
         self.A_d_LU, self.pivots_d = lu_factor(A_d.T)
 
-    def solve_from_gd(self, gd: Tensor, *, return_image: bool=False) -> Tensor:
+    def solve_from_gd(self, gd: Tensor, *, reshape: bool=False) -> Tensor:
         """
         @brief Solve the Laplace equation from a dirichlet boundary data.
+
+        @param gd: Tensor. Dirichlet condition(s) in the shape of (N_bd, ) or (C, N_bd).
+        @param reshape: bool. Reshape the output to the shape of the mesh\
+                if `True`. Defaults to `False`.
+
+        @return: Tensor. Solution in the shape of (N, ) or (C, N). If `reshape`\
+                is `True`, the shape of the output will be (Nx[, Ny[, Nz...]])\
+                or (C, Nx[, Ny[, Nz...]]).
         """
         if not hasattr(self, 'A_d_LU'):
             self._init_gd()
@@ -331,7 +344,7 @@ class LaplaceFDMSolver():
         if b_.ndim == 1:
             b_ = b_.unsqueeze(0)
             uh = lu_solve(A_d_LU, pivots_d, b_, left=False)
-            if return_image:
+            if reshape:
                 return uh.reshape(self.indexing.shape)
             else:
                 return uh[0, :]
@@ -339,7 +352,7 @@ class LaplaceFDMSolver():
         else:
             n_channel = b_.shape[0]
             uh = lu_solve(A_d_LU, pivots_d, b_, left=False)
-            if return_image:
+            if reshape:
                 return uh.reshape((n_channel, ) + self.indexing.shape)
             else:
                 return uh
@@ -356,9 +369,17 @@ class LaplaceFDMSolver():
         A_n_c[-1, -1] = 0.
         self.A_n_LU, self.pivots_n = lu_factor(A_n_c.T)
 
-    def solve_from_gn(self, gn: Tensor, *, return_image: bool=False) -> Tensor:
+    def solve_from_gn(self, gn: Tensor, *, reshape: bool=False) -> Tensor:
         """
         @brief Solve the Laplace equation from a neumann boundary data.
+
+        @param gn: Tensor. Neumann condition(s) in the shape of (N_bd, ) or (C, N_bd).
+        @param reshape: bool. Reshape the output to the shape of the mesh\
+                if `True`. Defaults to `False`.
+
+        @return: Tensor. Solution in the shape of (N, ) or (C, N). If `reshape`\
+                is `True`, the shape of the output will be (Nx[, Ny[, Nz...]])\
+                or (C, Nx[, Ny[, Nz...]]).
         """
         if not hasattr(self, 'A_n_LU'):
             self._init_gn()
@@ -372,7 +393,7 @@ class LaplaceFDMSolver():
             ZERO_ = torch.zeros((1, 1), dtype=self.dtype, device=self.device)
             b_ = torch.cat([b__, ZERO_], dim=-1)
             uh = lu_solve(A_n_LU, pivots_n, b_, left=False)[:, :-1]
-            if return_image:
+            if reshape:
                 return uh.reshape(self.indexing.shape)
             else:
                 return uh[0, :]
@@ -382,7 +403,7 @@ class LaplaceFDMSolver():
             ZERO_ = torch.zeros((n_channel, 1), dtype=self.dtype, device=self.device)
             b_ = torch.cat([b__, ZERO_], dim=-1)
             uh = lu_solve(A_n_LU, pivots_n, b_, left=False)[:, :-1]
-            if return_image:
+            if reshape:
                 return uh.reshape((n_channel, ) + self.indexing.shape)
             else:
                 return uh
@@ -390,13 +411,13 @@ class LaplaceFDMSolver():
     def normal_derivative(self, uh: Tensor):
         """
         @brief Calculates the directional derivative of the function along the\
-               outer normal direction on the boundary.
+                outer normal direction on the boundary.
 
         @param uh: Tensor. In the shape of (N, ) or (C, N), where C is the number of\
-               channels and N is the number of nodes.
+                channels and N is the number of nodes.
 
         @return: Tensor. In the shape of (N_bd, ) or (C, N_bd), where N_bd is the\
-                 number of boundary nodes.
+                number of boundary nodes.
         """
         assert uh.ndim in (1, 2)
         A = self.indexing.diffusion_neumann()

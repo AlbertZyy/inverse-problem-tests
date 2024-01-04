@@ -47,8 +47,8 @@ def laplace_eigen_fem(mesh) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
 
 EXTx, EXTy = config['mesh']["ext"]
 Lx, Ly = config['mesh']['length']
-Hx = EXTx/Lx
-Hy = EXTy/Ly
+Hx = Lx/EXTx
+Hy = Ly/EXTy
 Origin = config['mesh']['origin']
 N_REFINE = config['mesh']['refine']
 
@@ -66,6 +66,7 @@ if signal_ in {'y', 'Y'}:
 
     uniform_mesh = UniformMesh2d([0, EXTx, 0, EXTy], [Hx, Hy], origin=Origin)
     mesh = IntervalMesh.from_mesh_boundary(uniform_mesh)
+    del uniform_mesh
     NN = mesh.number_of_nodes()
     mesh.uniform_refine(N_REFINE)
 
@@ -74,7 +75,7 @@ if signal_ in {'y', 'Y'}:
     L = w.shape[0]
 
     w = w[1:NN+1]
-    v = v[1:NN+1, :NN]
+    v = v[:NN, 1:NN+1]
     A = A[:NN, :NN]
     M = M[:NN, :NN]
 

@@ -43,7 +43,7 @@ def laplace_eigen_fem(mesh) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
     bform_1.add_domain_integrator(ScalarMassIntegrator(q=Q_))
     M = bform_1.assembly().toarray()
     w, v = eigh(A, M)
-    return w, v, A, M
+    return w, v
 
 EXTx, EXTy = config['mesh']["ext"]
 Lx, Ly = config['mesh']['length']
@@ -67,19 +67,23 @@ if signal_ in {'y', 'Y'}:
     uniform_mesh = UniformMesh2d([0, EXTx, 0, EXTy], [Hx, Hy], origin=Origin)
     mesh = IntervalMesh.from_mesh_boundary(uniform_mesh)
     del uniform_mesh
+
+    space = LagrangeFESpace(mesh, p=1)
+    bform_1 = BilinearForm(space)
+    bform_1.add_domain_integrator(ScalarMassIntegrator(q=Q_))
+    M = bform_1.assembly().toarray()
+
     NN = mesh.number_of_nodes()
     mesh.uniform_refine(N_REFINE)
 
-    w, v, A, M = laplace_eigen_fem(mesh)
+    w, v = laplace_eigen_fem(mesh)
 
     L = w.shape[0]
 
     w = w[1:NN+1]
     v = v[:NN, 1:NN+1]
-    A = A[:NN, :NN]
-    M = M[:NN, :NN]
 
-    np.savez(config['file'], w=w, v=v, A=A, M=M)
+    np.savez(config['file'], w=w, v=v, M=M)
     print("Saved.")
 
     if args.plot:

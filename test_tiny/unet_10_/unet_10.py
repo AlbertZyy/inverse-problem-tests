@@ -121,7 +121,7 @@ def build_model(device: device, s_grad: bool=True):
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
     frac = MultiChannelFractional.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz", n_channel=8, hc_slope=4., device=device)
     frac.trainable_(s_grad)
-    frac.set_initial_([0., ]*8, [100., ]*8)
+    frac.set_initial_([0., ]*8, [10., ]*8)
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)
     model.to(device)

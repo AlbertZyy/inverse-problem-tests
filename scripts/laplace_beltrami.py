@@ -43,7 +43,7 @@ def laplace_eigen_fem(mesh) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
     bform_1.add_domain_integrator(ScalarMassIntegrator(q=Q_))
     M = bform_1.assembly().toarray()
     w, v = eigh(A, M)
-    return w, v
+    return w, v, A, M
 
 EXTx, EXTy = config['mesh']["ext"]
 Lx, Ly = config['mesh']['length']
@@ -68,32 +68,31 @@ if signal_ in {'y', 'Y'}:
     mesh = IntervalMesh.from_mesh_boundary(uniform_mesh)
     del uniform_mesh
 
-    space = LagrangeFESpace(mesh, p=1)
-    bform_1 = BilinearForm(space)
-    bform_1.add_domain_integrator(ScalarMassIntegrator(q=Q_))
-    M = bform_1.assembly().toarray()
-
     NN = mesh.number_of_nodes()
     mesh.uniform_refine(N_REFINE)
 
-    w, v = laplace_eigen_fem(mesh)
-
-    L = w.shape[0]
+    w, v, _, M = laplace_eigen_fem(mesh)
 
     w = w[1:NN+1]
+    vinv = (v.T @ M)[1:NN+1, :NN] * N_REFINE**2
     v = v[:NN, 1:NN+1]
 
-    np.savez(config['file'], w=w, v=v, M=M)
+    np.savez(config['file'], w=w, v=v, vinv=vinv)
     print("Saved.")
 
     if args.plot:
         from matplotlib import pyplot as plt
 
         fig = plt.figure()
-        axes = fig.add_subplot()
+
+        axes = fig.add_subplot(121)
         f = np.arange(0, NN)
         axes.plot(f, np.sqrt(w))
         axes.plot(f, (f+1)/2*np.pi/4)
+
+        axes = fig.add_subplot(122)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, index=slice(None, NN), showindex=True)
         plt.show()
 
 else:

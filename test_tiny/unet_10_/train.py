@@ -97,7 +97,6 @@ if signal_ not in {'y', 'Y'}:
 
 optim = SGD(model.parameters(), lr=lr,
             momentum=momentum, weight_decay=weight_decay)
-optim_2 = SGD((model.df_solver._frac.hc, ), lr=lr, momentum=momentum, weight_decay=1e-4)
 
 writer_1 = SummaryWriter(log_dir + MODEL_NAME, flush_secs=30)
 
@@ -111,22 +110,18 @@ def train(epoch: int):
 
     for gdgn, label in loader:
         optim.zero_grad()
-        optim_2.zero_grad()
 
         add_gaussian_noise(gdgn[:, :, 0, :], 0.0, 0.1)
         y_out = model(gdgn.to(device=device)) # (N, 1, Nx, Ny)
         loss = loss_fn(y_out, label.flatten().to(dtype=torch.float32, device=device))
         loss.backward()
         optim.step()
-        optim_2.step()
+
         step += 1
 
         writer_1.add_scalar('loss(train)', loss.item(), epoch*iter_per_epoch + step)
         for i in range(8):
             writer_1.add_scalar(f's{i}', model.df_solver._frac.s[i].item(), epoch*iter_per_epoch + step)
-
-        for i in range(8):
-            writer_1.add_scalar(f'hc{i}', model.df_solver._frac.hc[i].item(), epoch*iter_per_epoch + step)
 
     if SAVE:
         torch.save(model.state_dict(), checkpoint_path)

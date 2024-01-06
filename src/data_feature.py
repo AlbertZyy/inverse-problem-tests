@@ -72,6 +72,8 @@ class MultiChannelDataFeature(Module):
         gnvn = self._frac(gn - vn) # [C, NN_bd]
         return self._solver.solve_from_gn(gnvn) # [C, NN]
 
+    __call__: Callable[[Tensor], Tensor]
+
     def forward(self, data: Tensor):
         assert data.ndim == 4
         assert data.shape[2] == 2

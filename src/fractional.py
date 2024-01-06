@@ -3,72 +3,68 @@ from typing import Dict, Optional, Callable, Sequence
 
 from numpy.typing import NDArray
 import torch
-from torch.nn import Parameter, Module
+from torch.nn import Parameter, Module, init
 from torch import Tensor, float64, device, relu
 
 
 class Fractional(Module):
-    def __init__(self, s: float, w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None,
-                 *, dtype=float64, device: device=None) -> None:
-        """
-        @brief Fractional order operator
-
-        @param s: float. The order of the operator, a parameter of the module.
-        @param w: A Tensor containing eigen values of the operator.
-        @param V: A tensor containing eigen functions of the operator.
-        @param Vinv: The inverse of V, optional if V is orthogonal.
-        @param dtype: The data type of the module.
-        @param device: The device of the module.
-        """
+    def __init__(self, n_dofs: int, *, dtype=float64, device: device=None) -> None:
         super().__init__()
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_dofs = n_dofs
+        self.s = Parameter(torch.empty((), **kwargs))
+        self.w = Parameter(torch.empty((n_dofs, ), **kwargs), requires_grad=False)
+        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.constant_(self.s, 0.0)
+        init.zeros_(self.w)
+        init.orthogonal_(self.V)
+        with torch.no_grad():
+            # NOTE: Data should be copied from V.T to Vinv. Otherwise, V will be
+            # overriten by Vinv when loading the state dict.
+            self.Vinv.copy_(self.V.T)
+
+    def initialize(self, s: float, w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None):
+        """
+        @brief Initialize the fractional operator.
+        """
         assert w.ndim == 1
         assert V.ndim == 2
-        self.s = Parameter(torch.tensor(s, dtype=dtype, device=device))
-        self.w = Parameter(w.to(device=device, dtype=dtype), requires_grad=False)
-        self.V = Parameter(V.to(device=device, dtype=dtype), requires_grad=False)
-        if Vinv is None:
-            Vinv = self.V.T
-        else:
-            Vinv = Vinv.to(device=device, dtype=dtype)
-        self.Vinv = Parameter(Vinv, requires_grad=False)
+        with torch.no_grad():
+            init.constant_(self.s, s)
+            self.w.copy_(w)
+            self.V.copy_(V)
+            if Vinv is None:
+                Vinv = self.V.T
+            self.Vinv.copy_(Vinv)
 
-    @classmethod
-    def empty(cls, ndofs: int, *, dtype=float64, device: device=None):
-        """
-        @brief Create an empty fractional operator.
-
-        @param ndofs: int. The number of degrees of freedom.
-        """
-        s = 0.0
-        w = torch.empty((ndofs, ), dtype=dtype, device=device)
-        V = torch.empty((ndofs, ndofs), dtype=dtype, device=device)
-        return cls(s, w, V, dtype=dtype, device=device)
-
-    @classmethod
-    def from_npz(cls, filename: str, s: float, *, dtype=float64, device: device=None):
+    def from_npz(self, filename: str, s: float):
         """
         @brief Load a fractional operator from a .npz file.
 
-        @param filename: str. The name of the file. The file should contain the following keys:
+        @param filename: str. The name of the file. The file may contain the following keys:
             - 'w': A 1D tensor containing the eigen values.
             - 'v': A 2D tensor containing the eigen functions.
-            - 'vinv': A 2D tensor containing the inverse of v, optional if V is orthogonal.
+            - 'vinv': A 2D tensor containing the inverse of v, optional.
+            - 'M': The 2D mass matrix, satisfying `vinv=v.T@M`, optional. Ignored if `vinv` is provided.
 
         @param s: float. The order of the operator.
-
-        @return: Fractional. The fractional operator.
         """
         import numpy as np
         data: Dict[str, NDArray] = dict(np.load(filename))
         t_data = {k: torch.from_numpy(v) for k, v in data.items()}
 
         try:
-            if 'M' in t_data:
-                return cls(s, t_data['w'], t_data['v'], t_data['M'],
-                        dtype=dtype, device=device)
+            if 'vinv' in t_data:
+                self.initialize(s, t_data['w'], t_data['v'], t_data['vinv'])
+            elif 'M' in t_data:
+                Vinv = t_data['v'].T @ t_data['M']
+                self.initialize(s, t_data['w'], t_data['v'], Vinv)
             else:
-                return cls(s, t_data['w'], t_data['v'],
-                        dtype=dtype, device=device)
+                self.initialize(s, t_data['w'], t_data['v'])
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
@@ -85,72 +81,56 @@ class Fractional(Module):
 
 
 class MultiChannelFractional(Module):
-    def __init__(self, n_channel: int,
-                 w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None,
-                 hc_slope=2., *, dtype=float64, device: device=None) -> None:
-        """
-        @brief Fractional order operator with multiple channels.
-
-        @param n_channel: int. The number of channels.
-        @param w: A Tensor containing eigen values of the operator.
-        @param V: A tensor containing eigen functions of the operator.
-        @param Vinv: The inverse Tensor of V, optional if V is orthogonal.
-        @param hc_slope: float. The slope of the high cut.
-        @param dtype: The data type of the module.
-        @param device: The device of the module.
-        """
+    def __init__(self, n_dofs: int, n_channels: int, hc_slope=2., *, dtype=float64, device: device=None) -> None:
         super().__init__()
+        assert n_channels > 0
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_dofs = n_dofs
+        self.n_channels = n_channels
+        self.s = Parameter(torch.empty((n_channels, ), **kwargs))
+        self.hc = Parameter(torch.empty((n_channels, ), **kwargs), requires_grad=False)
+        self.hc_slope = Parameter(torch.tensor(hc_slope, dtype=dtype, device=device), requires_grad=False)
+        self.w = Parameter(torch.empty((n_dofs, ), **kwargs), requires_grad=False)
+        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.reset_paramters()
+
+    def reset_paramters(self):
+        init.constant_(self.s, 0.0)
+        init.constant_(self.hc, 1.0)
+        init.zeros_(self.w)
+        init.orthogonal_(self.V)
+        with torch.no_grad():
+            # NOTE: Data should be copied from V.T to Vinv. Otherwise, V will be
+            # overriten by Vinv when loading the state dict.
+            self.Vinv.copy_(self.V.T)
+
+    def initialize(self, s: Sequence[float], hc: Sequence[float],
+                   w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None):
+        """
+        @brief Initialize the fractional operator.
+        """
         assert w.ndim == 1
         assert V.ndim == 2
-        self.s = Parameter(torch.zeros((n_channel, ), dtype=dtype, device=device))
-        self.hc = Parameter(torch.ones((n_channel, ), dtype=dtype, device=device), requires_grad=False)
-        self.hc_slope = Parameter(torch.tensor(hc_slope, dtype=dtype, device=device), requires_grad=False)
-        self.w = Parameter(w.to(device=device, dtype=dtype), requires_grad=False)
-        self.V = Parameter(V.to(device=device, dtype=dtype), requires_grad=False)
-        if Vinv is None:
-            Vinv = self.V.T
-        else:
-            Vinv = Vinv.to(device=device, dtype=dtype)
-        self.Vinv = Parameter(Vinv, requires_grad=False)
-        self.max_eigen = torch.max(self.w)
-
-    def set_initial_(self, slope: Sequence[float], high_cut: Sequence[float]):
-        """
-        @brief Set the initial value of the order 's' and high cut 'hc'.
-
-        @param slope: A sequence of floats. The slope of the fractional order operator in each channel.
-        @param high_cut: A sequence of floats. The high cut of the eigen values in each channel.
-        """
-        dtype = self.s.dtype
-        device = self.s.device
+        assert Vinv.ndim == 2
         with torch.no_grad():
-            self.s[:] = torch.tensor(slope, dtype=dtype, device=device)
-            self.hc[:] = torch.tensor(high_cut, dtype=dtype, device=device)
+            self.s.copy_(torch.tensor(s, dtype=self.s.dtype, device=self.s.device))
+            self.hc.copy_(torch.tensor(hc, dtype=self.hc.dtype, device=self.hc.device))
+            self.w.copy_(w)
+            self.V.copy_(V)
+            if Vinv is None:
+                Vinv = self.V.T
+            self.Vinv.copy_(Vinv)
 
-        return self
-
-    @classmethod
-    def empty(cls, n_channel: int, ndofs: int, *, dtype=float64, device: device=None):
-        """
-        @brief Create an empty fractional operator.
-
-        @param n_channel: int. The number of channels.
-        @param ndofs: int. The number of degrees of freedom.
-        """
-        w = torch.empty((ndofs, ), dtype=dtype, device=device)
-        V = torch.empty((ndofs, ndofs), dtype=dtype, device=device)
-        return cls(n_channel, w=w, V=V, dtype=dtype, device=device)
-
-    @classmethod
-    def from_npz(cls, filename: str, n_channel: int, hc_slope=10.,
-                 *, dtype=float64, device: device=None):
+    def from_npz(self, filename: str, s: Sequence[float], hc: Sequence[float]):
         """
         @brief Load a fractional operator from a .npz file.
 
         @param filename: str. The name of the file. The file should contain the following keys:
             - 'w': A 1D tensor containing the eigen values.
             - 'v': A 2D tensor containing the eigen functions.
-            - 'vinv': A 2D tensor containing the inverse of v, optional if V is orthogonal.
+            - 'vinv': A 2D tensor containing the inverse of v, optional.
+            - 'M': The 2D mass matrix, satisfying `vinv=v.T@M`, optional. Ignored if `vinv` is provided.
 
         @param n_channel: int. The number of channels.
         @param hc_slope: float. The slope of the high cut.
@@ -163,11 +143,12 @@ class MultiChannelFractional(Module):
 
         try:
             if 'vinv' in t_data:
-                return cls(n_channel, w=t_data['w'], V=t_data['v'], Vinv=t_data['vinv'],
-                           hc_slope=hc_slope, dtype=dtype, device=device)
+                self.initialize(s, hc, t_data['w'], t_data['v'], t_data['vinv'])
+            elif 'M' in t_data:
+                Vinv = t_data['v'].T @ t_data['M']
+                self.initialize(s, hc, t_data['w'], t_data['v'], Vinv)
             else:
-                return cls(n_channel, w=t_data['w'], V=t_data['v'],
-                           hc_slope=hc_slope, dtype=dtype, device=device)
+                self.initialize(s, hc, t_data['w'], t_data['v'])
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
@@ -177,8 +158,7 @@ class MultiChannelFractional(Module):
         lam = self.w[None, :]
         hc = self.hc[:, None]
         slope = self.s[:, None]
-        max_e = self.max_eigen
-        L = torch.pow(lam, slope) * torch.pow(relu(lam/max_e/hc - 1) + 1, -self.hc_slope)
+        L = torch.pow(lam, slope) * torch.pow(relu(lam/hc - 1) + 1, -self.hc_slope)
         return torch.einsum('ij, cj, jk -> cik', V, L, Vinv)
 
     __call__: Callable[[Tensor], Tensor]

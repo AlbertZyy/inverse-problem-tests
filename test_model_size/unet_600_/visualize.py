@@ -23,7 +23,7 @@ model_3.eval()
 
 validation_set = NPZDataset('./data/gdgn_64_64_validate/', 200)
 
-NO_EVALUATE = False
+NO_EVALUATE = True
 NO_PLOT = False
 save_dir = './test_model_size/plot_data/'
 

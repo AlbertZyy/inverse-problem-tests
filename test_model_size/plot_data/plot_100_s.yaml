@@ -19,7 +19,7 @@ xlabel: 'iteration'
 ylabel: 's'
 
 xlim: 'auto'
-ylim: [0.0, 0.5]
+ylim: [0.0, 1.0]
 
 show: True
 save: './test_model_size/plot_data/s_100.png'

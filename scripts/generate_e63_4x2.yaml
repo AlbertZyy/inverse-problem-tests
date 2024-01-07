@@ -1,6 +1,6 @@
 
 head: 0
-tail: 100
+tail: 200
 
 data:
   sigma: [10., 1.]
@@ -11,4 +11,4 @@ data:
   dtype: 'float64'
 
 process_num: 4
-output_folder: './data/gdgn_64_64_4x2/'
+output_folder: './data/gdgn_64_64_4x2_validate/'

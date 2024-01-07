@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import MSELoss, Module
+from tqdm import tqdm
 
 sys.path.append('./test_model_size/unet_600_')
 from unet_600 import build_model
@@ -25,7 +26,7 @@ model_3.eval()
 
 validation_set = NPZDataset('./data/gdgn_64_64_validate/', 200)
 
-NO_EVALUATE = True
+NO_EVALUATE = False
 NO_PLOT = False
 save_dir = './test_noise/plot_data/'
 
@@ -43,8 +44,8 @@ if not NO_EVALUATE:
         loss = 0
         count = 0
 
-        for x, label in loader:
-            add_gaussian_noise(x[..., 0, :], 0.0, 0.2)
+        for x, label in tqdm(loader, desc='validation', unit='batch', dynamic_ncols=True):
+            add_gaussian_noise(x[..., 0, :], 0.05)
             y_pred = model(x)
             loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
             count += 1
@@ -67,7 +68,7 @@ if not NO_PLOT:
     for i in ID:
         fig = plt.figure(f"validate - {i}", figsize=(7.5, 7.5))
         data, label = validation_set[i]
-        add_gaussian_noise(data[..., 0, :], 0.0, 0.2)
+        add_gaussian_noise(data[..., 0, :], 0.05)
 
         for k, (model, name) in enumerate(zip([model_1, model_2, model_3],
                                               [name_1, name_2, name_3])):

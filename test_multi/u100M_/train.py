@@ -117,7 +117,8 @@ def train(epoch: int):
         step += 1
 
         writer_1.add_scalar('loss(train)', loss.item(), epoch*iter_per_epoch + step)
-        writer_1.add_scalar('s', model.df_solver._frac.s.item(), epoch*iter_per_epoch + step)
+        for i in range(8):
+            writer_1.add_scalar(f's{i}', model.df_solver._frac.s[i], epoch*iter_per_epoch + step)
 
     if SAVE:
         torch.save(model.state_dict(), checkpoint_path)

@@ -5,11 +5,10 @@ from torch import Tensor
 from torch.nn import Module
 
 from fdm import LaplaceFDMSolver
-from fractional import Fractional, MultiChannelFractional
 
 
 class DataFeatureFDMSolver(Module):
-    def __init__(self, laplace_solver: LaplaceFDMSolver, fractional_lb: Fractional) -> None:
+    def __init__(self, laplace_solver: LaplaceFDMSolver, fractional_lb: Module) -> None:
         super().__init__()
         self._solver = laplace_solver
         self._frac = fractional_lb
@@ -50,10 +49,10 @@ class DataFeatureFDMSolver(Module):
 
 
 class MultiChannelDataFeature(Module):
-    def __init__(self, laplace_solver: LaplaceFDMSolver, fractional_lb: MultiChannelFractional) -> None:
+    def __init__(self, laplace_solver: LaplaceFDMSolver, frac_lb: Module) -> None:
         super().__init__()
         self._solver = laplace_solver
-        self._frac = fractional_lb
+        self._frac = frac_lb
 
     def solve_phi(self, gd_gn: Tensor) -> Tensor:
         """

@@ -50,7 +50,8 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
     np.random.seed(seed)
 
     for sigma_idx in tqdm(sigma_iterable,
-                          desc=f"worker{index}",
+                          desc=f"task{index}",
+                          dynamic_ncols=True,
                           unit='sample',
                           position=index):
 

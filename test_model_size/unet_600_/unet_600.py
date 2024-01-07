@@ -130,7 +130,8 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
     frac = Fractional(252, device=device)
-    frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz", s)
+    frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
+    frac.initialize(s)
     frac.s.requires_grad_(s_grad)
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)

@@ -46,10 +46,12 @@ def loged(x: Tensor):
 
 
 solver = LaplaceFDMSolver([EXT, EXT], [H, H])
-frac = MultiChannelFractional.from_npz("./data/laplace_beltrami_63_63.npz", n_channel=8)
+frac = MultiChannelFractional(252, 8)
+frac.from_npz("./data/laplace_beltrami_63_63.npz")
+frac.initialize([0., ]*8, [391.72, ]*8)
 
 data_feature = MultiChannelDataFeature(solver, frac)
-dataset = NPZDataset("./data/gdgn_64_64_phrase2/", 10)
+dataset = NPZDataset("./data/gdgn_64_64_4x2/", 10)
 data, label = dataset[24]
 
 val = data_feature(data[None, ...])

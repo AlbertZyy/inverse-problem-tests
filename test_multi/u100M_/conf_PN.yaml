@@ -1,0 +1,24 @@
+
+data:
+  train_set_location: "./data/gdgn_64_64_4x2_train/"
+  train_set_volume: 5000
+  train_batch_size: 20
+  validate_set_location: "./data/gdgn_64_64_4x2_validate/"
+  validate_set_volume: 100
+  validate_batch_size: 20
+
+gpu_id: 0
+
+noise: 0.05
+tag: 'PN'
+
+epoch_start: 0
+epoch_end: 100
+
+lr: 0.001
+weight_decay: 0.000000001
+momentum: 0.9
+
+log_dir: "./test_multi/u100M_/logs/"
+save: True
+checkpoint_dir: "./test_multi/u100M_/checkpoints/"

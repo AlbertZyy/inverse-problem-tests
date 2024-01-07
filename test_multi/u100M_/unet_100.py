@@ -9,8 +9,8 @@ import torch.nn as nn
 sys.path.append("./src")
 
 from fdm import LaplaceFDMSolver
-from fractional import Fractional
-from data_feature import DataFeatureFDMSolver
+from fractional import MultiChannelFractional
+from data_feature import MultiChannelDataFeature
 
 
 class ConvBlock(nn.Module):
@@ -93,10 +93,10 @@ class Unet(nn.Module):
 
 
 class RevModel(nn.Module):
-    def __init__(self, n_channel: int, lsolver: LaplaceFDMSolver, frac: Fractional,
+    def __init__(self, n_channel: int, lsolver: LaplaceFDMSolver, frac: MultiChannelFractional,
                  *, network_dtype=float32) -> None:
         super().__init__()
-        self.df_solver = DataFeatureFDMSolver(lsolver, frac) # [N, 16, 64, 64]
+        self.df_solver = MultiChannelDataFeature(lsolver, frac) # [N, 16, 64, 64]
         self.bn = nn.BatchNorm2d(n_channel, momentum=0.9, dtype=lsolver.dtype)
         self.coordinate = lsolver.indexing.coordinate([-1, -1]) # [2, 64, 64]
         self.unet = Unet(n_channel+2, dtype=network_dtype)
@@ -119,25 +119,21 @@ class RevModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(device: device, s: float=0.0, s_grad: bool=True):
+def build_model(device: device, tag: str):
     EXT = 63
     H = 2./EXT
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
-    frac = Fractional(252, device=device)
+    frac = MultiChannelFractional(252, 8, device=device)
     frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
-    frac.initialize(s)
-    frac.s.requires_grad_(s_grad)
+    frac.initialize(s=[0., ]*8, hc=[391.72, ]*8)
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)
     model.to(device)
 
-    NAME = "unet_100"
+    NAME = "u100M"
 
-    if s_grad:
-        FULL_NAME = NAME + f"_s{int(s*100)}"
-    else:
-        FULL_NAME = NAME + f"_s{int(s*100)}_no_grad"
+    FULL_NAME = (NAME + '_' + tag) if tag else NAME
 
     print(f"Model built: {FULL_NAME}, in device: {device}")
 
@@ -145,7 +141,7 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_model_size/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
+        model.load_state_dict(torch.load(f"./test_multi/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")
@@ -154,4 +150,4 @@ def build_model(device: device, s: float=0.0, s_grad: bool=True):
 
 
 if __name__ == "__main__":
-    build_model('cpu', 0.0, False)
+    build_model('cpu', 'N')

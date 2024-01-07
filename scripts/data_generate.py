@@ -12,6 +12,7 @@ from numpy.random import rand
 from numpy.typing import NDArray
 from fealpy.cem.generator import LaplaceDataGenerator2d
 import yaml
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config", help="path of the .yaml file")
@@ -45,10 +46,13 @@ output_folder = config['output_folder']
 if output_folder[-1] != "/":
     output_folder += "/"
 
-def main(sigma_iterable: Sequence[int], seed=0):
+def main(sigma_iterable: Sequence[int], seed=0, index=0):
     np.random.seed(seed)
 
-    for sigma_idx in sigma_iterable:
+    for sigma_idx in tqdm(sigma_iterable,
+                          desc=f"worker{index}",
+                          unit='sample',
+                          position=index):
 
         count = 0
 
@@ -142,10 +146,10 @@ if __name__ == "__main__":
     PART = 4
     TM = int(time())
 
-    pool.apply_async(main, (NUM[0::PART], 621 + TM))
-    pool.apply_async(main, (NUM[1::PART], 928 + TM))
-    pool.apply_async(main, (NUM[2::PART], 122 + TM))
-    pool.apply_async(main, (NUM[3::PART], 222 + TM))
+    pool.apply_async(main, (NUM[0::PART], 621 + TM, 0))
+    pool.apply_async(main, (NUM[1::PART], 928 + TM, 1))
+    pool.apply_async(main, (NUM[2::PART], 122 + TM, 2))
+    pool.apply_async(main, (NUM[3::PART], 222 + TM, 3))
 
     pool.close()
     pool.join()

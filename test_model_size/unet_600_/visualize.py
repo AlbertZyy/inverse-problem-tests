@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import MSELoss, Module
+from tqdm import tqdm
 
 from unet_600 import build_model
 
@@ -41,7 +42,7 @@ if not NO_EVALUATE:
         loss = 0
         count = 0
 
-        for x, label in loader:
+        for x, label in tqdm(loader, desc='Validation', unit='batch'):
             y_pred = model(x)
             loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
             count += 1

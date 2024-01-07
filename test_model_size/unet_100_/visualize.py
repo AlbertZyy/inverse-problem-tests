@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import MSELoss, Module
+from tqdm import tqdm
 
 from unet_100 import build_model
 
@@ -23,8 +24,8 @@ model_3.eval()
 
 validation_set = NPZDataset('./data/gdgn_64_64_validate/', 200)
 
-NO_EVALUATE = True
-NO_PLOT = False
+NO_EVALUATE = False
+NO_PLOT = True
 save_dir = './test_model_size/plot_data/'
 
 
@@ -41,7 +42,7 @@ if not NO_EVALUATE:
         loss = 0
         count = 0
 
-        for x, label in loader:
+        for x, label in tqdm(loader, desc='Validation', unit='batch'):
             y_pred = model(x)
             loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
             count += 1

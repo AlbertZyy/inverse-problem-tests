@@ -74,7 +74,7 @@ if signal_ in {'y', 'Y'}:
     w, v, _, M = laplace_eigen_fem(mesh)
 
     w = w[1:NN+1]
-    vinv = (v.T @ M)[1:NN+1, :NN] * N_REFINE**2
+    vinv = (v.T @ M)[1:NN+1, :NN] * 2**N_REFINE
     v = v[:NN, 1:NN+1]
 
     np.savez(config['file'], w=w, v=v, vinv=vinv)

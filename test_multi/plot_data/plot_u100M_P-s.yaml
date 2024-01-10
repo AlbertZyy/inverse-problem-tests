@@ -1,0 +1,39 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './test_multi/plot_data/run-u100M_P-tag-s0.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s1.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s2.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s3.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s4.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s5.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s6.csv'
+  - './test_multi/plot_data/run-u100M_P-tag-s7.csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - s0
+  - s1
+  - s2
+  - s3
+  - s4
+  - s5
+  - s6
+  - s7
+
+
+fig_name: 'loss'
+title: 'Evolution of multiple s (noise 0%, 4x2, smooth 0.8)'
+
+xlabel: 'iteration'
+ylabel: 's'
+
+xlim: 'auto'
+ylim: [-0.1, 0.6]
+
+show: True
+save: './test_multi/plot_data/s_u100M_P.png'

@@ -1,0 +1,31 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './test_multi/plot_data/run-u100-tag-s.csv'
+  - './test_multi/plot_data/run-u100_N-tag-s.csv'
+  - './test_multi/plot_data/run-u100_P-tag-s.csv'
+  - './test_multi/plot_data/run-u100_PN-tag-s.csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - noise 0%
+  - noise 5%
+  - noise 0% (4x2)
+  - noise 5% (4x2)
+
+
+fig_name: 'loss'
+title: 'Evolution of single s (smooth 0.8)'
+
+xlabel: 'iteration'
+ylabel: 's'
+
+xlim: 'auto'
+ylim: [0., 1.]
+
+show: True
+save: './test_multi/plot_data/s_u100.png'

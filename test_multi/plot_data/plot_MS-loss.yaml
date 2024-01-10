@@ -1,0 +1,31 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './test_multi/plot_data/run-u100-tag-loss_validate_.csv'
+  - './test_multi/plot_data/run-u100M-tag-loss_validate_.csv'
+  - './test_multi/plot_data/run-u100_N-tag-loss_validate_.csv'
+  - './test_multi/plot_data/run-u100M_N-tag-loss_validate_.csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - single s, noise 0%
+  - multiple s, noise 0%
+  - single s, noise 5%
+  - multiple s, noise 5%
+
+
+fig_name: 'loss'
+title: 'Validation Loss (single vs. multiple, smooth 0.8)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.04, 0.14]
+
+show: True
+save: './test_multi/plot_data/loss_MS.png'

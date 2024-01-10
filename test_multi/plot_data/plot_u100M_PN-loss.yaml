@@ -1,0 +1,26 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './test_multi/plot_data/run-u100M_PN-tag-loss_train_.csv'
+  - './test_multi/plot_data/run-u100M_PN-tag-loss_validate_.csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - training
+  - validation
+
+fig_name: 'loss'
+title: 'Loss (4x2, multiple s, noise 5%, smooth 0.8)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.18]
+
+show: True
+save: './test_multi/plot_data/loss_u100M_PN.png'

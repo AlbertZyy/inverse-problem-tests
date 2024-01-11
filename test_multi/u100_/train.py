@@ -9,6 +9,7 @@ import torch
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 from unet_100 import build_model
 from dataset import NPZDataset
@@ -37,17 +38,19 @@ lr = config['lr']
 momentum = config['momentum']
 weight_decay = config['weight_decay']
 
-noise = config['noise']
+noise = config.get('noise', 0.0)
+s_trainable = config.get('s_trainable', True)
 
 ### build model & data set
 
 model, MODEL_NAME = build_model(device, tag=config['tag'])
+model.df_solver._frac.s.requires_grad_(s_trainable)
 
 data_conf = config['data']
 train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'])
 validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'])
-loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True)
-loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True)
+loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True, num_workers=2, pin_memory=True)
+loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=2, pin_memory=True)
 
 iter_per_epoch, remander = divmod(len(train_dataset), data_conf['train_batch_size'])
 assert remander == 0
@@ -55,6 +58,7 @@ assert remander == 0
 ### confirm
 
 print(f'\nStart training {MODEL_NAME} on {device}...')
+print(f"  - s trainable: {s_trainable}")
 
 print(f'Total {n_epoch} epochs(start with {epoch_start}), {iter_per_epoch} iterations per epoch.')
 print(f'Training set size: {len(train_dataset)}, noise: {noise}.')
@@ -105,12 +109,12 @@ if SAVE:
 def train(epoch: int):
     step = 0
 
-    for gdgn, label in loader:
+    for gdgn, label in tqdm(loader, desc=f'Epoch {epoch + 1}/{epoch_end}', unit='batch'):
         optim.zero_grad()
 
         add_gaussian_noise(gdgn[:, :, 0, :], noise)
 
-        y_out = model(gdgn.to(device=device)) # (N, 1, Nx, Ny)
+        y_out = model(gdgn.to(device=device, non_blocking=True)) # (N, 1, Nx, Ny)
         loss = loss_fn(y_out, label.flatten().to(dtype=torch.float32, device=device))
         loss.backward()
         optim.step()

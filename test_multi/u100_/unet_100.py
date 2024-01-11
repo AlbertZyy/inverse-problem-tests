@@ -10,7 +10,7 @@ sys.path.append("./src")
 
 from fdm import LaplaceFDMSolver
 from fractional import FractionalWithHighcut
-from data_feature import DataFeatureFDMSolver
+from data_feature import MultiChannelDataFeature
 
 
 class ConvBlock(nn.Module):
@@ -96,7 +96,7 @@ class RevModel(nn.Module):
     def __init__(self, n_channel: int, lsolver: LaplaceFDMSolver, frac: FractionalWithHighcut,
                  *, network_dtype=float32) -> None:
         super().__init__()
-        self.df_solver = DataFeatureFDMSolver(lsolver, frac) # [N, 16, 64, 64]
+        self.df_solver = MultiChannelDataFeature(lsolver, frac) # [N, 16, 64, 64]
         self.bn = nn.BatchNorm2d(n_channel, momentum=0.9, dtype=lsolver.dtype)
         self.coordinate = lsolver.indexing.coordinate([-1, -1]) # [2, 64, 64]
         self.unet = Unet(n_channel+2, dtype=network_dtype)

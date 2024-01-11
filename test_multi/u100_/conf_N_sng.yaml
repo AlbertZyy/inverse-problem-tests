@@ -10,7 +10,8 @@ data:
 gpu_id: 0
 
 noise: 0.05
-tag: 'N'
+tag: 'N_sng'
+s_trainable: False
 
 epoch_start: 0
 epoch_end: 100

@@ -3,7 +3,7 @@ from typing import Dict, Optional, Callable, Sequence
 
 from numpy.typing import NDArray
 import torch
-from torch.nn import Parameter, Module, init
+from torch.nn import Parameter, Module, init, Linear
 from torch import Tensor, float64, device, relu
 
 
@@ -207,4 +207,63 @@ class MultiChannelFractional(Module):
 
         @param data: Tensor. [n_channel, n_dof]
         """
+        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
+
+
+class EigenvalueFilter(Module):
+    def __init__(self, n_channels: int, n_dofs: int, *, dtype=float64, device: device=None) -> None:
+        super().__init__()
+        assert n_channels >= 1
+        assert n_dofs >= 2
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_channels = n_channels
+        self.n_dofs = n_dofs
+        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.gain = Parameter(torch.empty((n_channels, n_dofs), **kwargs))
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        init.zeros_(self.gain)
+        init.orthogonal_(self.V)
+        with torch.no_grad():
+            self.Vinv.copy_(self.V.T)
+
+    def setup(self, v: Tensor, vinv: Optional[Tensor]=None, *, non_blocking=False):
+        kwargs = dict(non_blocking=non_blocking)
+        with torch.no_grad():
+            self.V.copy_(v, **kwargs)
+
+        if vinv is None:
+            self.Vinv.copy_(self.V.T, **kwargs)
+        else:
+            self.Vinv.copy_(vinv, **kwargs)
+
+    def from_npz(self, filename: str) -> None:
+        import numpy as np
+        data: Dict[str, NDArray] = dict(np.load(filename))
+        t_data = {k: torch.from_numpy(v) for k, v in data.items()}
+        del data
+
+        try:
+            if 'vinv' in t_data:
+                self.setup(t_data['v'], t_data['vinv'])
+            elif 'M' in t_data:
+                Vinv = t_data['v'].T @ t_data['M']
+                self.setup(t_data['v'], Vinv)
+            else:
+                self.setup(t_data['v'])
+        except KeyError:
+            raise KeyError(f"The file '{filename}' does not contain the required data.")
+
+    def matrix(self): # -> [n_channel, n_dof, n_dof]
+        L = torch.pow(10., self.gain)
+        return torch.einsum('ij, cj, jk -> cik', self.V, L, self.Vinv)
+
+    __call__: Callable[[Tensor], Tensor]
+
+    def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
+        return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
+
+    def alpha(self, data: Tensor) -> Tensor:
         return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)

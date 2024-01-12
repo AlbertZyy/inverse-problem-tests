@@ -9,7 +9,7 @@ import torch.nn as nn
 sys.path.append("./src")
 
 from fdm import LaplaceFDMSolver
-from fractional import MultiChannelFractional
+from fractional import EigenvalueFilter
 from data_feature import MultiChannelDataFeature
 
 
@@ -18,7 +18,7 @@ class ConvBlock(nn.Module):
         super().__init__()
         in_, out_ = in_channel, out_channel
         self.conv_1 = nn.Conv2d(in_, out_, kernel, padding=kernel//2, dtype=dtype) # [N, 10, 64, 64]
-        self.conv_2 = nn.Conv2d(out_, out_, kernel, padding=kernel//2, dtype=dtype) # [N, 10, 64, 64]
+        self.conv_2 = nn.Conv2d(out_, out_, kernel, padding=kernel//2, bias=False, dtype=dtype) # [N, 10, 64, 64]
         self.bn = nn.BatchNorm2d(out_, momentum=0.9, dtype=dtype)
         self.down = nn.AvgPool2d(kernel_size=2) # [N, 10, 32, 32]
 
@@ -36,7 +36,7 @@ class ConvTBlock(nn.Module):
         in_, out_ = in_channel, out_channel
         self.up = nn.ConvTranspose2d(in_, in_//2, 3, 2, 1, 1, dtype=dtype)
         self.convt_1 = nn.ConvTranspose2d(in_, out_, kernel, padding=kernel//2, dtype=dtype)
-        self.convt_2 = nn.ConvTranspose2d(out_, out_, kernel, padding=kernel//2, dtype=dtype)
+        self.convt_2 = nn.ConvTranspose2d(out_, out_, kernel, padding=kernel//2, bias=False, dtype=dtype)
         self.bn = nn.BatchNorm2d(out_, momentum=0.9, dtype=dtype)
 
     def forward(self, phi: Tensor, conn: Tensor):
@@ -57,9 +57,11 @@ class Unet(nn.Module):
         self.cb1 = ConvBlock(n_channel, 12, 9, dtype=dtype) # [N, 12, 32, 32]
         self.cb2 = ConvBlock(12, 24, 5, dtype=dtype) # [N, 24, 16, 16]
         self.cb3 = ConvBlock(24, 48, 3, dtype=dtype) # [N, 48, 8, 8]
+        self.cb4 = ConvBlock(48, 96, 3, dtype=dtype) # [N, 96, 4, 4]
 
-        self.btm = nn.Conv2d(48, 96, 3, 1, 1, dtype=dtype)
+        self.btm = nn.Conv2d(96, 192, 3, 1, 1, dtype=dtype)
 
+        self.ctb4 = ConvTBlock(192, 96, 3, dtype=dtype) # [N, 96, 4, 4]
         self.ctb3 = ConvTBlock(96, 48, 3, dtype=dtype) # [N, 48, 16, 16]
         self.ctb2 = ConvTBlock(48, 24, 5, dtype=dtype) # [N, 24, 32, 32]
         self.ctb1 = ConvTBlock(24, 12, 9, dtype=dtype) # [N, 12, 64, 64]
@@ -71,9 +73,12 @@ class Unet(nn.Module):
         phi, p1 = self.cb1(input)
         phi, p2 = self.cb2(phi)
         phi, p3 = self.cb3(phi)
+        phi, p4 = self.cb4(phi)
 
         phi = self.btm(phi)
 
+        phi = self.ctb4(phi, p4)
+        del p4
         phi = self.ctb3(phi, p3)
         del p3
         phi = self.ctb2(phi, p2)
@@ -88,7 +93,7 @@ class Unet(nn.Module):
 
 
 class RevModel(nn.Module):
-    def __init__(self, n_channel: int, lsolver: LaplaceFDMSolver, frac: MultiChannelFractional,
+    def __init__(self, n_channel: int, lsolver: LaplaceFDMSolver, frac: nn.Module,
                  *, network_dtype=float32) -> None:
         super().__init__()
         self.df_solver = MultiChannelDataFeature(lsolver, frac) # [N, 16, 64, 64]
@@ -114,24 +119,20 @@ class RevModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(device: device, s_grad: bool=True):
+def build_model(device: device, tag: str):
     EXT = 63
     H = 2./EXT
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
-    frac = MultiChannelFractional.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz", n_channel=8, hc_slope=1., device=device)
-    frac.s.requires_grad_(s_grad)
-    frac.set_initial_([0., ]*8, [0.125**2, ]*8)
+    frac = EigenvalueFilter(8, 252, device=device)
+    frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)
     model.to(device)
 
-    NAME = "unet_10"
+    NAME = "u100"
 
-    if s_grad:
-        FULL_NAME = NAME + f"_s"
-    else:
-        FULL_NAME = NAME + f"_s_no_grad"
+    FULL_NAME = (NAME + '_' + tag) if tag else NAME
 
     print(f"Model built: {FULL_NAME}, in device: {device}")
 
@@ -139,7 +140,7 @@ def build_model(device: device, s_grad: bool=True):
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_tiny/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
+        model.load_state_dict(torch.load(f"./test_base/{NAME}_/checkpoints/{FULL_NAME}.pth", map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")
@@ -148,4 +149,4 @@ def build_model(device: device, s_grad: bool=True):
 
 
 if __name__ == "__main__":
-    build_model('cpu', False)
+    build_model('cpu', '')

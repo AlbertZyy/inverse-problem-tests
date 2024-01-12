@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 
 fig = plt.figure()
 axes = fig.add_subplot(1, 1, 1)
-axes.plot(gain.T.detach().abs().numpy())
+axes.plot(gain[:, :].T.detach().abs().numpy())
 # axes.set_ylim(-0.1, 0.1)
 
 # axes = fig.add_subplot(1, 2, 2)

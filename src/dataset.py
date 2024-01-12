@@ -1,11 +1,14 @@
 
+from typing import List, Optional, Tuple
+
 import numpy as np
 import torch
+from torch import Tensor
 from torch.utils.data import Dataset
 
 
 class NPZDataset(Dataset):
-    def __init__(self, folder: str, num: int, label_key='label') -> None:
+    def __init__(self, folder: str, num: int, label_key='label', use_cache=False) -> None:
         """
         @brief Initialize a dataset from `.npz` files.
 
@@ -26,14 +29,22 @@ class NPZDataset(Dataset):
         self.path = folder
         self.num = num
         self.label_key = label_key
+        self.use_cache = use_cache
+        self._cache: List[Optional[Tuple[Tensor, Tensor]]] = [None, ] * num
 
     def __len__(self):
         return self.num
 
     def __getitem__(self, index):
-        datadict = dict(np.load(self.path + f"{index}.npz"))
-        label = datadict[self.label_key]
-        del datadict[self.label_key]
-        channels = [arr for arr in datadict.values()]
-        data = np.stack(channels, axis=0)
-        return torch.from_numpy(data), torch.from_numpy(label)
+        if self.use_cache and self._cache[index] is not None:
+            return self._cache[index]
+        else:
+            datadict = dict(np.load(self.path + f"{index}.npz"))
+            label = datadict[self.label_key]
+            del datadict[self.label_key]
+            channels = [arr for arr in datadict.values()]
+            data = np.stack(channels, axis=0)
+            pair = torch.from_numpy(data), torch.from_numpy(label)
+            if self.use_cache:
+                self._cache[index] = pair
+            return pair

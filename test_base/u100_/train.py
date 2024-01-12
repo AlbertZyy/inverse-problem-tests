@@ -9,7 +9,7 @@ import torch
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 from unet_100 import build_model
 from dataset import NPZDataset
@@ -46,8 +46,8 @@ model, MODEL_NAME = build_model(device, tag=config['tag'])
 data_conf = config['data']
 train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'])
 validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'])
-loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True, num_workers=3, pin_memory=True)
-loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=3, pin_memory=True)
+loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True, num_workers=4, pin_memory=True, prefetch_factor=4)
+loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=4, pin_memory=True)
 
 iter_per_epoch, remander = divmod(len(train_dataset), data_conf['train_batch_size'])
 assert remander == 0
@@ -104,7 +104,7 @@ if SAVE:
 def train(epoch: int):
     step = 0
 
-    for gdgn, label in tqdm(loader, desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch'):
+    for gdgn, label in tqdm(loader, desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
         optim.zero_grad()
 
         add_gaussian_noise(gdgn[:, :, 0, :], noise)
@@ -128,10 +128,10 @@ def validate(epoch):
         y_out = model(gdgn.to(device=device))
         loss = loss_fn(y_out, label.flatten().to(dtype=torch.float32, device=device))
 
-    writer_1.add_scalar('loss(validate)', loss.item(), (epoch + 1)*iter_per_epoch)
+    writer_1.add_scalar('loss(validate)', loss.item(), iter_head + (epoch + 1)*iter_per_epoch)
 
 
-for epoch in range(n_epoch):
+for epoch in trange(0, n_epoch, desc='Training', unit='epoch'):
     train(epoch)
     validate(epoch)
 

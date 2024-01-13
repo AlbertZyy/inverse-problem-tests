@@ -1,15 +1,11 @@
 
 from functools import reduce
-from typing import Sequence, Optional, Callable, Union, Literal, TypeVar
+from typing import Sequence, Optional, Callable, TypeVar
 
 import torch
 from torch import Tensor, int32, float64, device
 from torch.linalg import lu_factor, lu_solve
 
-
-IndexFunc = Callable[[Tensor], Tensor]
-IndexFuncOrTensor = Union[Tensor, IndexFunc]
-BlockIndex = Sequence[Literal[-1, 0, 1]]
 
 _Self = TypeVar('_Self')
 _RT = TypeVar('_RT')
@@ -36,7 +32,8 @@ class Indexing():
         @brief Build a indexing system in a N-d uniform mesh.
 
         @param steps: Sequence[int]. Number of nodes along each dimension.
-        @param margin: int. Distance from the working area to the real boundary.
+        @param itype: torch.dtype. Data type of the indexing Tensor.
+        @param device: torch.device. Device of the indexing Tensor.
         """
         GD = len(steps)
         _NN = reduce(lambda x, y:x*y, steps)
@@ -129,6 +126,9 @@ class Indexing():
 
 
 class UniformPartition(Indexing):
+    """
+    @brief Build a partition system in a N-d uniform mesh.
+    """
     @classmethod
     def from_uniform_mesh(cls, mesh):
         extent = mesh.extent
@@ -284,7 +284,7 @@ class UniformPartition(Indexing):
         @brief Construct coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
 
         @param origin: Sequence[float]. Origin of the coordinate system.\
-                Length of the sequence should be equal to the geometry dimension.
+               Length of the sequence should be equal to the geometry dimension.
 
         @return: Tensor. Coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
         """
@@ -331,8 +331,8 @@ class LaplaceFDMSolver():
                 if `True`. Defaults to `False`.
 
         @return: Tensor. Solution in the shape of (N, ) or (C, N). If `reshape`\
-                is `True`, the shape of the output will be (Nx[, Ny[, Nz...]])\
-                or (C, Nx[, Ny[, Nz...]]).
+                 is `True`, the shape will be (Nx[, Ny[, Nz...]])\
+                 or (C, Nx[, Ny[, Nz...]]).
         """
         if not hasattr(self, 'A_d_LU'):
             self._init_gd()
@@ -361,9 +361,8 @@ class LaplaceFDMSolver():
         indexing = self.indexing
         NN = indexing.NN
         A_n_c = torch.empty((NN+1, NN+1), dtype=self.dtype, device=self.device)
-        A_n = indexing.diffusion_neumann()
         c = indexing.boundary_flag().to(dtype=torch.int)
-        A_n_c[:-1, :-1] = A_n
+        A_n_c[:-1, :-1] = indexing.diffusion_neumann()
         A_n_c[-1, :-1] = c
         A_n_c[:-1, -1] = c
         A_n_c[-1, -1] = 0.
@@ -375,11 +374,11 @@ class LaplaceFDMSolver():
 
         @param gn: Tensor. Neumann condition(s) in the shape of (N_bd, ) or (C, N_bd).
         @param reshape: bool. Reshape the output to the shape of the mesh\
-                if `True`. Defaults to `False`.
+               if `True`. Defaults to `False`.
 
         @return: Tensor. Solution in the shape of (N, ) or (C, N). If `reshape`\
-                is `True`, the shape of the output will be (Nx[, Ny[, Nz...]])\
-                or (C, Nx[, Ny[, Nz...]]).
+                 is `True`, the shape will be (Nx[, Ny[, Nz...]])\
+                 or (C, Nx[, Ny[, Nz...]]).
         """
         if not hasattr(self, 'A_n_LU'):
             self._init_gn()
@@ -411,13 +410,13 @@ class LaplaceFDMSolver():
     def normal_derivative(self, uh: Tensor):
         """
         @brief Calculates the directional derivative of the function along the\
-                outer normal direction on the boundary.
+               outer normal direction on the boundary.
 
         @param uh: Tensor. In the shape of (N, ) or (C, N), where C is the number of\
-                channels and N is the number of nodes.
+               channels and N is the number of nodes.
 
         @return: Tensor. In the shape of (N_bd, ) or (C, N_bd), where N_bd is the\
-                number of boundary nodes.
+                 number of boundary nodes.
         """
         assert uh.ndim in (1, 2)
         A = self.indexing.diffusion_neumann()

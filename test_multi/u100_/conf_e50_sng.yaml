@@ -2,18 +2,20 @@
 data:
   train_set_location: "./data/gdgn_64_64_train/"
   train_set_volume: 10000
-  train_batch_size: 100
+  train_batch_size: 500
   validate_set_location: "./data/gdgn_64_64_validate/"
   validate_set_volume: 200
   validate_batch_size: 100
 
 gpu_id: 0
 
+high_cut: 2448.27
 noise: 0.05
-tag: 'N'
+tag: 'e50_sng'
+s_trainable: False
 
-epoch_start: 0
-epoch_end: 100
+iter_head: 0
+epochs: 1000
 
 lr: 0.001
 weight_decay: 0.000000001

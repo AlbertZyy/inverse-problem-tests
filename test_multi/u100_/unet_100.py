@@ -119,14 +119,14 @@ class RevModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(device: device, tag: str):
+def build_model(device: device, tag: str, hc: float):
     EXT = 63
     H = 2./EXT
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
     frac = FractionalWithHighcut(252, device=device)
     frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
-    frac.initialize(0., 391.72)
+    frac.initialize(0., hc)
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)
     model.to(device)

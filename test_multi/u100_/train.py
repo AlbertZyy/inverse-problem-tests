@@ -47,8 +47,8 @@ model, MODEL_NAME = build_model(device, tag=config['tag'], hc=hc)
 model.df_solver._frac.s.requires_grad_(s_trainable)
 
 data_conf = config['data']
-train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'])
-validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'])
+train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'], use_cache=True)
+validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'], use_cache=True)
 loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True, num_workers=4, pin_memory=True)
 loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=1, pin_memory=True)
 

@@ -36,7 +36,7 @@ class Indexing():
         @param device: torch.device. Device of the indexing Tensor.
         """
         GD = len(steps)
-        _NN = reduce(lambda x, y:x*y, steps)
+        _NN = reduce(lambda x, y:x*y, steps, initial=1)
         _node = torch.arange(_NN, dtype=itype, device=device).reshape(steps)
         self.GD = GD
         self.NN = _NN
@@ -279,7 +279,7 @@ class UniformPartition(Indexing):
             b[I] += cdim[d]
         return b[self.boundary_flag()]
 
-    def coordinate(self, origin: Sequence[float]):
+    def coordinate(self, origin: Sequence[float]) -> Tensor:
         """
         @brief Construct coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
 
@@ -289,16 +289,20 @@ class UniformPartition(Indexing):
         @return: Tensor. Coordinate Tensor in shape (GD, Nx[, Ny[, Nz...]]).
         """
         GD = self.GD
-        assert GD == len(origin)
+        if len(origin) != GD:
+            raise ValueError(f"Origin sequence length ({len(origin)}) must match"
+                             " the geometry dimension ({GD}).")
         dtype = self.dtype
         device = self.device
+
         if isinstance(origin, Tensor):
-            ori = origin
+            origin_tensor = origin.to(device=device)
         else:
-            ori = torch.tensor(origin, dtype=dtype, device=device)
+            origin_tensor = torch.tensor(origin, dtype=dtype, device=device)
+
         mesh = torch.stack(self.index_grid(), dim=0)
         coor = torch.einsum("d..., d -> d...", mesh, self.h)
-        coor += ori.reshape((GD, ) + (1, )*GD)
+        coor += origin_tensor.reshape((GD, ) + (1, )*GD)
         return coor
 
 

@@ -1,0 +1,14 @@
+
+head: 0
+tail: 200
+
+data:
+  sigma: [10., 1.]
+  ext: 127
+  freq: [1, 2, 3, 4, 5, 6, 8, 16]
+  phrase: [0., ]
+  ch_names: ['1', '2', '3', '4', '5', '6', '8', '16']
+  dtype: 'float64'
+
+process_num: 2
+output_folder: './data/gdgn_128_128_train/'

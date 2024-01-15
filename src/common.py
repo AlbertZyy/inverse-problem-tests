@@ -8,7 +8,7 @@ def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
     return torch.mean(val)
 
 
-def add_gaussian_noise(tensor: Tensor, std=1., noise_only=False):
+def add_gaussian_noise(tensor: Tensor, std=1.):
     """
     Adds multiplicative Gaussian noise to the given PyTorch tensor. In-place operation.
 
@@ -19,14 +19,9 @@ def add_gaussian_noise(tensor: Tensor, std=1., noise_only=False):
     Returns:
         Tensor: Tensor with added Gaussian noise.
     """
-    noise = torch.randn_like(tensor)
-    noise *= std
-
-    if noise_only:
-        return tensor * noise
-    else:
-        torch.mul(tensor, noise + 1., out=tensor)
-        return tensor
+    noise = torch.randn_like(tensor) * std + 1.
+    tensor.copy_(tensor * noise)
+    return tensor
 
 
 if __name__ == '__main__':

@@ -35,14 +35,14 @@ class Indexing():
         @param itype: torch.dtype. Data type of the indexing Tensor.
         @param device: torch.device. Device of the indexing Tensor.
         """
-        GD = len(steps)
-        _NN = reduce(lambda x, y:x*y, steps, initial=1)
-        _node = torch.arange(_NN, dtype=itype, device=device).reshape(steps)
-        self.GD = GD
+        _NN = reduce(lambda x, y:x*y, steps, 1)
+        self._node = torch.arange(_NN, dtype=itype, device=device).reshape(steps)
+        self.GD = len(steps)
         self.NN = _NN
-        self.node = _node
-        self.steps = steps
-        self.device = device
+
+    @property
+    def node(self):
+        return self._node
 
     @property
     def shape(self):
@@ -52,9 +52,28 @@ class Indexing():
     def itype(self):
         return self.node.dtype
 
+    @property
+    def device(self):
+        return self.node.device
+
+    def flatten(self, __index_nd: Optional[Tensor]=None):
+        """
+        @brief Convert the n-d index to the 1-d index.
+
+        The n-d index is a Tensor of shape (..., GD), where GD is the dimension of\
+        the mesh. The 1-d index is a Tensor of shape (...,).
+        """
+        index = __index_nd
+        if index is None:
+            return self.node.flatten()
+        if index.shape[-1] != self.GD:
+            raise ValueError(f"The last dimension of the n-d index ({index.shape[-1]})"
+                             f"must be equal to the dimension ({self.GD}) of the mesh.")
+        return self.node[index.split(1, dim=-1)].squeeze(-1)
+
     def shifted(self, dim: int, movement: int):
         """
-        @brief Return the index of nodes in the area shifted towards a specific\
+        @brief Return the 1-d index of nodes in the area shifted towards a specific\
                direction.
         """
         index = [slice(None, None, None), ] * self.GD
@@ -66,8 +85,8 @@ class Indexing():
 
     def layer(self, dim: int, layer: int):
         """
-        @brief Return the index of nodes on a specific layer perpendicular to a\
-               specific direction.
+        @brief Return the 1-d index of nodes on a specific layer perpendicular to\
+               a specific direction.
         """
         index = [slice(None, None, None), ] * self.GD
         index[dim] = layer
@@ -93,7 +112,7 @@ class Indexing():
 
     def interior(self, padding: int=0):
         """
-        @brief Return the index of all interior nodes.
+        @brief Return the 1-d index of all interior nodes.
         """
         if padding == 0:
             index = [slice(None, None, None), ] * self.GD
@@ -105,7 +124,7 @@ class Indexing():
 
     def shift(self, index: Tensor, dim: int, step: int, *, inplace=False):
         """
-        @brief Moves the given index array in a specific direction in the grid.
+        @brief Moves the given node in a specific direction in the grid.
         """
         assert dim < self.GD and dim >= -self.GD
         if not inplace:
@@ -119,7 +138,7 @@ class Indexing():
         @brief Return the mesh grid of the node positions.
         """
         mesh = torch.meshgrid(
-            [torch.arange(0, e, device=self.device) for e in self.steps],
+            [torch.arange(0, e, device=self.device) for e in self.shape],
             indexing='ij'
         )
         return mesh
@@ -127,7 +146,7 @@ class Indexing():
 
 class UniformPartition(Indexing):
     """
-    @brief Build a partition system in a N-d uniform mesh.
+    @brief Uniform partition system in a N-d uniform mesh.
     """
     @classmethod
     def from_uniform_mesh(cls, mesh):
@@ -332,7 +351,7 @@ class LaplaceFDMSolver():
 
         @param gd: Tensor. Dirichlet condition(s) in the shape of (N_bd, ) or (C, N_bd).
         @param reshape: bool. Reshape the output to the shape of the mesh\
-                if `True`. Defaults to `False`.
+               if `True`. Defaults to `False`.
 
         @return: Tensor. Solution in the shape of (N, ) or (C, N). If `reshape`\
                  is `True`, the shape will be (Nx[, Ny[, Nz...]])\
@@ -410,6 +429,20 @@ class LaplaceFDMSolver():
                 return uh.reshape((n_channel, ) + self.indexing.shape)
             else:
                 return uh
+
+    def boundary_value(self, uh: Tensor):
+        """
+        @brief Extract the boundary value of the function.
+
+        @param uh: Tensor. In the shape of (N, ) or (C, N), where C is the number of\
+               channels and N is the number of nodes.
+
+        @return: Tensor. In the shape of (N_bd, ) or (C, N_bd), where N_bd is the\
+                 number of boundary nodes.
+        """
+        assert uh.ndim in (1, 2)
+        is_bd_node = self.indexing.boundary_flag()
+        return uh[..., is_bd_node].contiguous()
 
     def normal_derivative(self, uh: Tensor):
         """

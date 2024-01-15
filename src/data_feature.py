@@ -1,7 +1,7 @@
 
-from typing import Callable
+from typing import Callable, Sequence
 import torch
-from torch import Tensor
+from torch import Tensor, device, int32, float64
 from torch.nn import Module
 
 from fdm import LaplaceFDMSolver
@@ -54,6 +54,12 @@ class MultiChannelDataFeature(Module):
         self._solver = laplace_solver
         self._frac = frac_lb
 
+    @classmethod
+    def from_domain(cls, size: Sequence[int], h: Sequence[float], frac_lb: Module,
+                    *, itype=int32, dtype=float64, device: device=None):
+        solver = LaplaceFDMSolver(size, h, itype=itype, dtype=dtype, device=device)
+        return cls(solver, frac_lb)
+
     def solve_phi(self, gd_gn: Tensor) -> Tensor:
         """
         @brief From gd_gn data to data feature.
@@ -93,3 +99,18 @@ class MultiChannelDataFeature(Module):
         # NOTE: Return the result as a 4-d image.
         MESH = self._solver.indexing.shape
         return val.reshape((BATCH, CHANNEL) + MESH)
+
+    # NOTE: This method is for testing, do not call it in other methods or in training.
+    def gd2gn_diff(self, data: Tensor):
+        assert data.ndim == 4
+        assert data.shape[2] == 2
+        BATCH, CHANNEL, _, NNBD = data.shape
+
+        # NOTE: Merge the Batch and Channel axis to vectorize in the FDM solver.
+        data = data.reshape(-1, 2, NNBD) # [N*C, 2, NN_bd]
+        gd, gn = data[:, 0, :], data[:, 1, :] # [N*C, NN_bd]
+        vuh = self._solver.solve_from_gd(gd) # [N*C, NN]
+        vn = self._solver.normal_derivative(vuh) # [N*C, NN_bd]
+
+        # NOTE: Restore the Batch axis to return.
+        return (gn - vn).reshape(BATCH, CHANNEL, NNBD) # [N, C, NN_bd]

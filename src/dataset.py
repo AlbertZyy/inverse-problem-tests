@@ -12,7 +12,8 @@ ArrayFunction = Callable[[NDArray[Any]], NDArray[Any]]
 
 
 class NPZDataset(Dataset):
-    def __init__(self, folder: str, num: int=-1, label_key='label', use_cache=False) -> None:
+    def __init__(self, folder: str, num: int=-1, channel_keys: Optional[List[str]]=None,
+                 label_key='label', *, use_cache=False) -> None:
         """
         @brief Initialize a dataset from `.npz` files.
 
@@ -37,6 +38,7 @@ class NPZDataset(Dataset):
             import os
             num = len([f for f in os.listdir(folder) if f.endswith('.npz')])
 
+        self.channel_keys = channel_keys
         self.label_key = label_key
         self.use_cache = use_cache
         self._cache: List[Optional[Tuple[Tensor, Tensor]]] = [None, ] * num
@@ -51,14 +53,21 @@ class NPZDataset(Dataset):
             datadict = dict(np.load(self.path + f"{index}.npz"))
             label = datadict[self.label_key]
             del datadict[self.label_key]
-            channels = [arr for arr in datadict.values()]
+
+            if self.channel_keys is None:
+                channels = [arr for arr in datadict.values()]
+            else:
+                channels = [datadict[key] for key in self.channel_keys]
+
             data = np.stack(channels, axis=0)
             pair = torch.from_numpy(data), torch.from_numpy(label)
+
             if self.use_cache:
                 self._cache[index] = pair
             return pair
 
-    def transform_to(self, func: ArrayFunction, destination_folder: str):
+    def transform_to(self, func: Callable[[Dict[str, NDArray]], None],
+                     destination_folder: str, *, tqdm=False):
         """
         @brief Transform the data and save to a new folder.
         """
@@ -68,12 +77,15 @@ class NPZDataset(Dataset):
         import os
         os.makedirs(destination_folder, exist_ok=True)
 
-        for i in range(self.num):
+        if tqdm:
+            from tqdm import tqdm
+            iterator = tqdm(range(self.num), desc=f"Transform", unit='sample')
+        else:
+            iterator = range(self.num)
+
+        for i in iterator:
             datadict = dict(np.load(self.path + f"{i}.npz"))
-            for key, value in datadict.items():
-                if key == self.label_key:
-                    continue
-                datadict[key] = func(value)
+            func(datadict)
             np.savez(destination_folder + f"{i}.npz", **datadict)
 
 

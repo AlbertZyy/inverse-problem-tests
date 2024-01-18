@@ -1,5 +1,5 @@
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 
 import numpy as np
 import torch
@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 
 class NPZDataset(Dataset):
-    def __init__(self, folder: str, num: int, label_key='label', use_cache=False) -> None:
+    def __init__(self, folder: str, num: int=-1, label_key='label', use_cache=False) -> None:
         """
         @brief Initialize a dataset from `.npz` files.
 
@@ -28,6 +28,11 @@ class NPZDataset(Dataset):
 
         self.path = folder
         self.num = num
+
+        if num == -1:
+            import os
+            num = len([f for f in os.listdir(folder) if f.endswith('.npz')])
+
         self.label_key = label_key
         self.use_cache = use_cache
         self._cache: List[Optional[Tuple[Tensor, Tensor]]] = [None, ] * num
@@ -48,3 +53,25 @@ class NPZDataset(Dataset):
             if self.use_cache:
                 self._cache[index] = pair
             return pair
+
+
+def load_npz_dataset(config_dict: Dict[str, Any]) -> NPZDataset:
+    """
+    @brief Setup a npz dataset from a config dict.
+
+    The dict may contain the following keys:
+    - location: str. The path to the folder containing `.npz` files.
+    - num: int, optional. The number of samples whose indices range from 0 to num-1,\
+           defaults to -1.
+    - label_key: str, optional. The name of the label data in a `.npz` file, defaults to "label".
+    - use_cache: bool, optional. Whether to cache the data, defaults to False.
+    """
+    location: str   = config_dict['location']
+    num: int        = config_dict.get('num', -1)
+    label_key: str  = config_dict.get('label_key', "label")
+    use_cache: bool = config_dict.get('use_cache', False)
+
+    if location[-1] != '/':
+        location += '/'
+
+    return NPZDataset(location, num, label_key, use_cache)

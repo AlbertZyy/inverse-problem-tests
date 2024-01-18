@@ -220,7 +220,6 @@ class EigenvalueFilter(Module):
         self.n_dofs = n_dofs
         self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
         self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.gain = Parameter(torch.empty((n_channels, n_dofs), **kwargs))
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -256,14 +255,18 @@ class EigenvalueFilter(Module):
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
-    def matrix(self): # -> [n_channel, n_dof, n_dof]
-        L = torch.pow(10., self.gain)
-        return torch.einsum('ij, cj, jk -> cik', self.V, L, self.Vinv)
-
     __call__: Callable[[Tensor], Tensor]
 
-    def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
-        return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
+    def inverse(self, __eigenfunc_coef: Tensor) -> Tensor:
+        """
+        @brief Map from the eigenfunction domain.
+        """
+        return torch.einsum('ik, ...ck -> ...ci', self.V, __eigenfunc_coef)
 
-    def alpha(self, data: Tensor) -> Tensor:
-        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
+    def direct(self, __func_data: Tensor) -> Tensor:
+        """
+        @brief Map to the eigenfunction domain.
+        """
+        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, __func_data)
+
+    forward = direct

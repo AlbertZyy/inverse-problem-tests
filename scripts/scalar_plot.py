@@ -60,9 +60,6 @@ for file_name in config['csv_files']:
     step = data[:, 1].astype(np.int_)
     value = data[:, 2]
 
-    if config.get('log', False):
-        value = np.log10(value)
-
     if config.get('smooth', 0):
         value = exponential_moving_average(value, config['smooth'])
 
@@ -71,6 +68,9 @@ for file_name in config['csv_files']:
 
     elif config['plot_type'] in {'scatter', 'Scatter', 'S'}:
         axes.scatter(step, value)
+
+    if config.get('log', False):
+        axes.set_yscale('log')
 
     else:
         raise ValueError(f"Unknown plot type {config['plot_type']}.")

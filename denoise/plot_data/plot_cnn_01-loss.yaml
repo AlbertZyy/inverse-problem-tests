@@ -1,0 +1,26 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './denoise/plot_data/run-cnn-tag-loss_train_.csv'
+  - './denoise/plot_data/run-cnn-tag-loss_validate_.csv'
+
+log: True
+smooth: 0.8
+
+legends:
+  - training
+  - validation
+
+fig_name: 'loss'
+title: 'Loss (noise 1%, smoothing 0.8)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: 'auto'
+
+show: True
+save: './denoise/plot_data/loss_cnn_01.png'

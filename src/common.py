@@ -3,6 +3,7 @@ from typing import Dict, Any, Iterable
 
 import torch
 from torch import Tensor
+from torch.nn import Module
 
 
 OPTIM_MAP = {
@@ -39,6 +40,22 @@ def add_gaussian_noise(tensor: Tensor, std=1.):
         Tensor: Tensor with added Gaussian noise.
     """
     noise = torch.randn_like(tensor) * std + 1.
+    tensor.copy_(tensor * noise)
+    return tensor
+
+
+def add_filtered_gaussian_noise(filter: Module, tensor: Tensor, std=1.) -> Tensor:
+    """
+    Adds multiplicative Gaussian noise to the given PyTorch tensor. In-place operation.
+
+    Parameters:
+        filter (Module): Filter module.
+        tensor (Tensor): Input tensor.
+
+    Returns:
+        Tensor: Tensor with added Gaussian noise.
+    """
+    noise = filter(torch.randn_like(tensor)) * std + 1.
     tensor.copy_(tensor * noise)
     return tensor
 

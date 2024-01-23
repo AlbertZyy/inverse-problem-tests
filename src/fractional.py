@@ -3,7 +3,7 @@ from typing import Dict, Optional, Callable, Sequence
 
 from numpy.typing import NDArray
 import torch
-from torch.nn import Parameter, Module, init, Linear
+from torch.nn import Parameter, Module, init
 from torch import Tensor, float64, device, relu
 
 

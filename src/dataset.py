@@ -1,13 +1,14 @@
 
-from typing import List, Optional, Tuple, Dict, Any, Callable
+from typing import List, Optional, Tuple, Dict, Any, Callable, Iterator, Union
 
 import numpy as np
 from numpy.typing import NDArray
 import torch
-from torch import Tensor, dtype, device
+from torch import Tensor
 from torch.utils.data import Dataset, BatchSampler, RandomSampler
 
 
+_device = torch.device
 ArrayFunction = Callable[[NDArray[Any]], NDArray[Any]]
 
 
@@ -112,58 +113,69 @@ def load_npz_dataset(config_dict: Dict[str, Any]) -> NPZDataset:
 
 
 class TPZDataset(Dataset):
-    def __init__(self, folder: str,
-                 channel_shape: Tuple[int, ...],
-                 label_shape: Tuple[int, ...],
-                 channel_dtype: dtype,
-                 label_dtype: dtype,
-                 *,
-                 num: int=-1,
-                 channel_keys: Optional[List[str]]=None,
-                 label_key='label',
-                 device: device=None,
-                 pin_memory: bool=False,
+    path: str
+    num: int
+    channel_keys: List[str]
+    label_key: str
+
+    def __init__(self, folder: str, *, num: int=-1,
+                 channel_keys: Optional[List[str]]=None, label_key='label',
+                 device: Union[_device, str, None]=None, pin_memory: Optional[bool]=False,
                  tqdm: bool=False) -> None:
         super().__init__()
         assert isinstance(folder, str)
-        assert num > 0
+        assert isinstance(num, int)
         kwargs = {'device': device, 'pin_memory': pin_memory}
 
-        if folder[-1] != '/':
-            folder += '/'
-
-        self.path = folder
+        self.path = folder if folder[-1] == '/' else folder + '/'
         self.num = num
 
         if num == -1:
             import os
             num = len([f for f in os.listdir(folder) if f.endswith('.npz')])
 
-        self.channel_keys = channel_keys
+        self.channel_keys = channel_keys if channel_keys else []
         self.label_key = label_key
-        CHANNEL = len(channel_keys)
-        self.data = torch.empty((num, CHANNEL, *channel_shape), dtype=channel_dtype, **kwargs)
-        self.labels = torch.empty((num, *label_shape), dtype=label_dtype, **kwargs)
 
+        self._header_data_read = False
+
+        iterator = range(self.num)
         if tqdm:
-            from tqdm import trange
-            iterator = trange(0, self.num, desc=f"Loading", unit='sample')
-        else:
-            iterator = range(self.num)
+            from tqdm import tqdm as _tqdm
+            iterator = _tqdm(iterator, desc=f"Loading", unit='sample')
+
         for index in iterator:
-            pair = self._preload_data(index)
-            self.data[index], self.labels[index] = pair
+
+            if not self._header_data_read: # the first data
+                pair = self._preload_data(0)
+                data_shape = pair[0].shape
+                data_dtype = pair[0].dtype
+                label_shape = pair[1].shape
+                label_dtype = pair[1].dtype
+                self.data = torch.empty((self.num, *data_shape),
+                                        dtype=data_dtype, **kwargs)
+                self.labels = torch.empty((self.num, *label_shape),
+                                          dtype=label_dtype, **kwargs)
+                self._header_data_read = True
+
+            else: # other data
+                pair = self._preload_data(index)
+
+            self.data[index].copy_(pair[0], non_blocking=True)
+            self.labels[index].copy_(pair[1], non_blocking=True)
 
     def _preload_data(self, index: int):
         assert index >= 0 and index < self.num
-        datadict = dict(np.load(self.path + f"{index}.npz"))
+        file_name = self.path + f"{index}.npz"
+        datadict = dict(np.load(file_name))
         label = datadict[self.label_key]
         del datadict[self.label_key]
+        if len(datadict) == 0:
+            raise ValueError(f"No channel data found in the file '{file_name}'.")
 
-        if self.channel_keys is None:
-            channels = [arr for arr in datadict.values()]
-        else:
-            channels = [datadict[key] for key in self.channel_keys]
+        if len(self.channel_keys) == 0:
+            self.channel_keys.extend(datadict.keys())
+        channels = [datadict[key] for key in self.channel_keys]
 
         data = np.stack(channels, axis=0)
         pair = torch.from_numpy(data), torch.from_numpy(label)
@@ -179,45 +191,58 @@ class TPZDataset(Dataset):
         return self.data[indices].contiguous(), self.labels[indices].contiguous()
 
     def loader(self, batch_size: int, drop_last=False):
-        return _TPZLoader(self, batch_size, drop_last)
+        return _TPZLoader(dataset=self, batch_size=batch_size, drop_last=drop_last)
 
 
 class _TPZLoader():
+    dataset: TPZDataset
+    batch_size: int
+    sampler: RandomSampler
+    batch_sampler: BatchSampler
+    _iterator: Iterator
+    __initialized: bool = False
+
     def __init__(self, dataset: TPZDataset, batch_size: int, drop_last: bool=False):
         self.dataset = dataset
         self.batch_size = batch_size
         self.sampler = RandomSampler(self.dataset, num_samples=self.dataset.num)
         self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size, drop_last=drop_last)
-        self.iterator = iter(self.batch_sampler)
+        self._iterator = iter(self.batch_sampler)
+        self.__initialized = True
 
     def __len__(self):
         return len(self.batch_sampler)
 
     def __next__(self):
-        indices = next(self.iterator)
+        indices = next(self._iterator)
         return self.dataset.__getitems__(indices)
 
     def __iter__(self):
         return self
+
+    def __setattr__(self, attr: str, val: Any) -> None:
+        if self.__initialized and attr in {
+            'dataset', 'batch_size', 'sampler', 'batch_sampler', '_iterator',
+        }:
+            raise RuntimeError(f"Cannot set attribute {attr} after {self.__class__.__name__} is initialized.")
+
+        super().__setattr__(self, attr, val)
 
 
 if __name__ == '__main__':
     from time import time
 
     dataset = TPZDataset("./data/gdgn_64_64_train/",
-                         channel_shape=(2, 252),
-                         label_shape=(64, 64),
-                         channel_dtype=torch.float64,
-                         label_dtype=torch.bool,
                          num=50,
-                         channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'],
-                         label_key='label',
                          device='cpu',
-                         pin_memory=False)
+                         pin_memory=False,
+                         tqdm=True)
+
+    print(dataset.channel_keys)
 
     t1 = time()
 
     for data, label in dataset.loader(10, drop_last=False):
-        pass
+        print(data.stride())
 
     print(time() - t1)

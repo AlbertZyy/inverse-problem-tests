@@ -65,15 +65,13 @@ for file_name in config['csv_files']:
 
     if config['plot_type'] in {'line', 'Line', 'L'}:
         axes.plot(step, value)
-
     elif config['plot_type'] in {'scatter', 'Scatter', 'S'}:
         axes.scatter(step, value)
+    else:
+        raise ValueError(f"Unknown plot type {config['plot_type']}.")
 
     if config.get('log', False):
         axes.set_yscale('log')
-
-    else:
-        raise ValueError(f"Unknown plot type {config['plot_type']}.")
 
 
 axes.legend(config['legends'])

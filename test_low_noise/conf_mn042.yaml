@@ -10,8 +10,9 @@ data:
 gpu_id: 0
 
 noise: 0.42
-tag: 'n042'
+tag: 'mn042'
 s_trainable: True
+multi_s: True
 
 
 iter_head: 0

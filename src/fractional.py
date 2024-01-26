@@ -116,15 +116,25 @@ class FractionalWithHighcut(Fractional):
 
 
 class MultiChannelFractional(Module):
-    def __init__(self, n_dofs: int, n_channels: int, hc_slope=2., *, dtype=float64, device: device=None) -> None:
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 high_cut: bool=False, hc_slope=2.,
+                 dtype=float64, device: device=None) -> None:
         super().__init__()
         assert n_channels > 0
         kwargs = dict(dtype=dtype, device=device)
         self.n_dofs = n_dofs
         self.n_channels = n_channels
         self.s = Parameter(torch.empty((n_channels, ), **kwargs))
-        self.hc = Parameter(torch.empty((n_channels, ), **kwargs), requires_grad=False)
-        self.hc_slope = Parameter(torch.tensor(hc_slope, dtype=dtype, device=device), requires_grad=False)
+
+        if high_cut:
+            self.hc = Parameter(torch.empty((n_channels, ), **kwargs), requires_grad=False)
+            self.hc_slope = Parameter(torch.tensor(hc_slope, dtype=dtype, device=device), requires_grad=False)
+            self.matrix = self._transform_with_high_cut
+        else:
+            self.register_parameter('hc', None)
+            self.register_parameter('hc_slope', None)
+            self.matrix = self._transform
+
         self.w = Parameter(torch.empty((n_dofs, ), **kwargs), requires_grad=False)
         self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
         self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
@@ -132,7 +142,8 @@ class MultiChannelFractional(Module):
 
     def reset_paramters(self):
         init.constant_(self.s, 0.0)
-        init.constant_(self.hc, 1.0)
+        if self.hc is not None:
+            init.constant_(self.hc, self.w.max().item())
         init.zeros_(self.w)
         init.orthogonal_(self.V)
         with torch.no_grad():
@@ -148,17 +159,21 @@ class MultiChannelFractional(Module):
             self.V.copy_(V)
             if Vinv is None:
                 Vinv = self.V.T
-            assert Vinv.ndim == 2
+            else:
+                assert Vinv.ndim == 2
             self.Vinv.copy_(Vinv)
 
-    def initialize(self, s: Sequence[float], hc: Sequence[float]):
+    def initialize(self, s: Sequence[float], hc: Optional[Sequence[float]]=None):
         """
         @brief Initialize the fractional operator order and the eigen value highcut\
                for each channel.
         """
         with torch.no_grad():
             self.s.copy_(torch.tensor(s, dtype=self.s.dtype, device=self.s.device))
-            self.hc.copy_(torch.tensor(hc, dtype=self.hc.dtype, device=self.hc.device))
+            if hc is not None:
+                if self.hc is None:
+                    raise ValueError("The high cut has been disabled.")
+                self.hc.copy_(torch.tensor(hc, dtype=self.hc.dtype, device=self.hc.device))
 
     def from_npz(self, filename: str):
         """
@@ -187,7 +202,15 @@ class MultiChannelFractional(Module):
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
-    def matrix(self): # -> [n_channel, n_dof, n_dof]
+    def _transform(self):
+        V = self.V
+        Vinv = self.Vinv
+        lam = self.w[None, :]
+        slope = self.s[:, None]
+        L = torch.pow(lam, slope)
+        return torch.einsum('ij, cj, jk -> cik', V, L, Vinv)
+
+    def _transform_with_high_cut(self):
         V = self.V
         Vinv = self.Vinv
         lam = self.w[None, :]

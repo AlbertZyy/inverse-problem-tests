@@ -9,7 +9,7 @@ import torch.nn as nn
 sys.path.append("./src")
 
 from fdm import LaplaceFDMSolver
-from fractional import Fractional
+from fractional import Fractional, MultiChannelFractional
 from data_feature import MultiChannelDataFeature
 
 
@@ -119,19 +119,25 @@ class RevModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(device: device, tag: str):
+def build_model(device: device, tag: str, multi_s=False):
     EXT = 63
     H = 2./EXT
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
-    frac = Fractional(252, device=device)
-    frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
-    frac.initialize(0.)
+    if not multi_s:
+        frac = Fractional(252, device=device)
+        frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
+        frac.initialize(0.)
+    else:
+        frac = MultiChannelFractional(252, 8, device=device)
+        frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
+        frac.initialize([0., ]*8)
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)
     model.to(device)
 
     NAME = "u100"
+    NAME += "M" if multi_s else ""
 
     FULL_NAME = (NAME + '_' + tag) if tag else NAME
 

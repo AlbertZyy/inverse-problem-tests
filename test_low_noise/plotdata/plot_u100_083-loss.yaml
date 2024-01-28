@@ -3,10 +3,8 @@
 plot_type: 'line'
 
 csv_files:
-  - './test_low_noise/plotdata/run-u100_n083-tag-loss_train_.csv'
-  - './test_low_noise/plotdata/run-u100_n083-tag-loss_validate_.csv'
-  - './test_low_noise/plotdata/run-u100_n083_sng-tag-loss_train_.csv'
-  - './test_low_noise/plotdata/run-u100_n083_sng-tag-loss_validate_.csv'
+  - './test_low_noise/plotdata/run-u100M_mn083-tag-loss_train_.csv'
+  - './test_low_noise/plotdata/run-u100M_mn083-tag-loss_validate_.csv'
 
 log: False
 smooth: 0.8
@@ -14,11 +12,9 @@ smooth: 0.8
 legends:
   - training
   - validation
-  - training (sng)
-  - validation (sng)
 
 fig_name: 'loss'
-title: 'Loss (noise 0.83, smooth 0.8)'
+title: 'Loss (noise 0.83, s multiple, smooth 0.8)'
 
 xlabel: 'iteration'
 ylabel: 'loss'
@@ -27,4 +23,4 @@ xlim: 'auto'
 ylim: [0.0, 0.12]
 
 show: True
-save: './test_low_noise/plotdata/loss_u100_n083.png'
+save: './test_low_noise/plotdata/loss_u100M_mn083.png'

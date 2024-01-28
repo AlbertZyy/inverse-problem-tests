@@ -2,8 +2,8 @@
 import os
 from typing import (
     Optional, Union,
-    List, Tuple, Dict, Collection, Iterable, Sequence,
-    Any, Callable, Iterator,
+    List, Tuple, Dict, Sequence,
+    Any, Callable, Iterator
 )
 
 import numpy as np
@@ -26,7 +26,7 @@ class NPZDataset(Dataset):
     _cache: Optional[List[Optional[Tuple[Tensor, Tensor]]]]
 
     def __init__(self, folder: str, names: Union[Sequence[Any], int]=-1, *,
-                 channel_keys: Optional[List[str]]=None, label_key='label',
+                 channel_keys: Optional[Sequence[str]]=None, label_key='label',
                  keep_dim=False,
                  use_cache=False) -> None:
         """
@@ -68,8 +68,8 @@ class NPZDataset(Dataset):
             return False
         return self._cache[index] is not None
 
-    def _read_data(self, fname: str):
-        file_name = os.path.join(self.path, f"{fname}.npz")
+    def _read_data(self, fname: Any):
+        file_name = os.path.join(self.path, str(fname) + ".npz")
         with np.load(file_name) as f:
             datadict = dict(f)
         label = datadict[self.label_key]
@@ -88,7 +88,7 @@ class NPZDataset(Dataset):
         pair = torch.from_numpy(data), torch.from_numpy(label)
         return pair
 
-    def _read_batch(self, names: Sequence[str]):
+    def _read_batch(self, names: Sequence[Any]):
         return [self._read_data(name) for name in names]
 
     def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
@@ -147,7 +147,7 @@ def load_npz_dataset(config_dict: Dict[str, Any]) -> NPZDataset:
 
 class TPZDataset(NPZDataset):
     def __init__(self, folder: str, names: Union[Sequence[Any], int]=-1, *,
-                 channel_keys: Optional[Iterable[str]]=None, label_key='label',
+                 channel_keys: Optional[Sequence[str]]=None, label_key='label',
                  keep_dim: bool=False, num_workers: int=0,
                  device: Union[_device, str, None]=None, pin_memory: Optional[bool]=False,
                  tqdm: bool=False) -> None:

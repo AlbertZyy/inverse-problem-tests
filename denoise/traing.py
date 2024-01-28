@@ -94,7 +94,7 @@ loss_fn = torch.nn.MSELoss()
 writer_1 = SummaryWriter(log_dir + MODEL_NAME, flush_secs=30)
 filter_ = Fractional(252, device=device)
 filter_.from_npz(f"./data/laplace_beltrami_{63}_{63}.npz")
-filter_.initialize(1.0)
+filter_.initialize(0.75)
 filter_.s.requires_grad_(False)
 
 ### train

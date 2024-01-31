@@ -1,7 +1,7 @@
 
 import torch
 import torch.nn as nn
-from torch import device, float64, float32
+from torch import device, float64
 
 
 class NoiseExtractCNN(nn.Module):
@@ -9,17 +9,32 @@ class NoiseExtractCNN(nn.Module):
         super(NoiseExtractCNN, self).__init__()
         NC = n_channels
         NHC = hidden
-        self.conv1 = nn.Conv1d(NC, NHC, 3, padding=1, padding_mode='circular')
-        self.conv2 = nn.Conv1d(NHC, NHC, 3, padding=1, padding_mode='circular')
-        self.conv3 = nn.Conv1d(NHC, NHC, 3, padding=1, padding_mode='circular')
-        self.conv4 = nn.Conv1d(NHC, NC, 3, padding=1, padding_mode='circular')
+        kwargs = dict(padding_mode='circular', dtype=float64)
+        self.conv1 = nn.Conv1d(NC, NHC, 3, padding=1, **kwargs)
+        self.conv2 = nn.Conv1d(NHC, NHC, 3, padding=1, **kwargs)
+        self.bn12 = nn.BatchNorm1d(NHC, momentum=0.9, dtype=float64)
+        self.down = nn.AvgPool1d(kernel_size=2)
+
+        self.btm = nn.Conv1d(NHC, NHC, 3, padding=1, **kwargs)
+
+        self.up = nn.ConvTranspose1d(NHC, NHC, 3, 2, 1, 1, dtype=float64)
+        self.conv3 = nn.Conv1d(NHC, NHC, 3, padding=1, **kwargs)
+        self.conv4 = nn.Conv1d(NHC, NC, 3, padding=1, **kwargs)
+        self.bn34 = nn.BatchNorm1d(NC, momentum=0.9, dtype=float64)
 
     def forward(self, input):
-        x = torch.relu_(self.conv1(input.to(float32)))
-        x = torch.relu_(self.conv2(x))
-        x = torch.relu_(self.conv3(x))
-        x = torch.relu_(self.conv4(x))
-        return input - x.to(float64)
+        x = self.conv1(input)
+        x = self.conv2(x)
+        x = torch.relu_(self.bn12(x))
+        x = self.down(x)
+
+        x = self.btm(x)
+
+        x = self.up(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = torch.relu_(self.bn34(x))
+        return input + x
 
 
 def build_model(device: device, tag: str):

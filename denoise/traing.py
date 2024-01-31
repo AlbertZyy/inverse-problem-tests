@@ -7,14 +7,13 @@ sys.path.append('./src')
 import yaml
 import torch
 from torch.optim import SGD
-from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
-from dataset import NPZDataset
+from dataset import TPZDataset
 from cnn import build_model
-from fractional import Fractional
-from common import add_multi_std_gaussian_noise
+from common import add_multi_std_gaussian_noise, total_variation
 
 
 parser = argparse.ArgumentParser()
@@ -30,19 +29,26 @@ SAVE            = config['save']
 GPU_ID          = config['gpu_id']
 iter_head: int  = config['iter_head']
 n_epoch: int    = config['epochs']
-lr              = config['lr']
-momentum        = config.get('momentum', 0)
-weight_decay    = config.get('weight_decay', 0.0)
+tv_scale: int   = config['tv_scale']
 
 
 device = torch.device(f'cuda:{GPU_ID}' if torch.cuda.is_available() else 'cpu')
 
-train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'])
-validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'])
-loader_1 = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'],
-                      shuffle=True, num_workers=6, pin_memory=True, prefetch_factor=4)
-loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'],
-                      shuffle=True, num_workers=2, pin_memory=True)
+train_dataset = TPZDataset(
+    data_conf['train_set_location'],
+    data_conf['train_set_volume'],
+    channel_keys=data_conf['train_set_channels'],
+    num_workers=0,
+    tqdm=True
+)
+validate_dataset = TPZDataset(
+    data_conf['validate_set_location'],
+    data_conf['validate_set_volume'],
+    channel_keys=data_conf['validate_set_channels'],
+    num_workers=0,
+    tqdm=True
+)
+
 iter_per_epoch, remander = divmod(len(train_dataset), data_conf['train_batch_size'])
 assert remander == 0
 
@@ -55,10 +61,8 @@ print(f'\nStart training {MODEL_NAME} on {device}...')
 print(f'Total {n_epoch} epochs(iter from {iter_head}), {iter_per_epoch} iterations per epoch.')
 print(f'Training set size: {len(train_dataset)}.')
 print(f'Validation set size: {len(validate_dataset)}.', end='\n\n')
-print("Train(SGD) setup:")
-print(f"  - learning rate: {lr}")
-print(f"  - momentum: {momentum}")
-print(f"  - weight decay: {weight_decay}", end='\n\n')
+print(f"SGD: {config['optim'].items()}\n")
+print(f"TV scale: {tv_scale}")
 
 log_dir = config['log_dir']
 if log_dir[-1] != '/':
@@ -88,21 +92,18 @@ if signal_ not in {'y', 'Y'}:
 
 ### training
 
-optim = SGD(model.parameters(), lr=lr,
-            momentum=momentum, weight_decay=weight_decay)
+EXT = 63
+bd_index = torch.zeros((4*EXT, ), dtype=torch.int, device=device)
+bd_index[0     : EXT]   = torch.arange(0, EXT)
+bd_index[EXT   : 2*EXT] = torch.arange(EXT, 3*EXT, 2)
+bd_index[2*EXT : 3*EXT] = torch.arange(4*EXT-1, 3*EXT-1, -1)
+bd_index[3*EXT : ]      = torch.arange(3*EXT-1, EXT, -2)
+
+
+optim = SGD(model.parameters(), **config['optim'])
 loss_fn = torch.nn.MSELoss()
-writer_1 = SummaryWriter(log_dir + MODEL_NAME, flush_secs=30)
-filter_ = Fractional(252, device=device)
-filter_.from_npz(f"./data/laplace_beltrami_{63}_{63}.npz")
-filter_.initialize(0.75)
-filter_.s.requires_grad_(False)
+writer_1 = SummaryWriter(log_dir + MODEL_NAME, max_queue=1000, flush_secs=30)
 
-### train
-
-optim = SGD(model.parameters(), lr=lr,
-            momentum=momentum, weight_decay=weight_decay)
-
-writer_1 = SummaryWriter(log_dir + MODEL_NAME, flush_secs=30)
 
 if SAVE:
     import os
@@ -112,7 +113,8 @@ if SAVE:
 def train(epoch: int):
     step = 0
 
-    for gdgn, _ in tqdm(loader_1, desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
+    for gdgn, _ in tqdm(train_dataset.loader(batch_size=data_conf['train_batch_size']),
+                        desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
         optim.zero_grad()
         BATCH, CHANNEL, _, BDDOF = gdgn.shape
         gdgn_ori = gdgn.clone().to(device=device, non_blocking=True)
@@ -122,13 +124,18 @@ def train(epoch: int):
         noise = torch.exp(g) * 1e-2
         add_multi_std_gaussian_noise(gdgn[:, :, 0, :], noise)
 
-        y_out = model(filter_(gdgn.reshape(BATCH, CHANNEL*2, BDDOF)))
-        loss = loss_fn(y_out,
-                       filter_(gdgn_ori.reshape(BATCH, CHANNEL*2, BDDOF)))
+        y_out = model(gdgn.reshape(BATCH, CHANNEL*2, BDDOF))
+        mse = loss_fn(y_out, gdgn_ori.reshape(BATCH, CHANNEL*2, BDDOF))
+        tv = total_variation(y_out[..., bd_index], boundary='circular')
+        loss = mse + tv * tv_scale
         loss.backward()
         optim.step()
         step += 1
 
+        writer_1.add_scalar('mse(train)', mse.item(),
+                            iter_head + epoch*iter_per_epoch + step)
+        writer_1.add_scalar('tv(train)', tv.item(),
+                            iter_head + epoch*iter_per_epoch + step)
         writer_1.add_scalar('loss(train)', loss.item(),
                             iter_head + epoch*iter_per_epoch + step)
 
@@ -137,7 +144,7 @@ def train(epoch: int):
 
 
 def validate(epoch):
-    gdgn, _ = next(iter(loader_2))
+    gdgn, _ = next(validate_dataset.loader(batch_size=data_conf['validate_batch_size']))
     BATCH, CHANNEL, _, BDDOF = gdgn.shape
     with torch.no_grad():
         gdgn = gdgn.to(device=device, non_blocking=True)

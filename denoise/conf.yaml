@@ -1,23 +1,27 @@
 
 data:
   train_set_location: "./data/gdgn_64_64_train/"
-  train_set_volume: 10000
+  train_set_volume: 200
   train_batch_size: 100
+  train_set_channels: ['1', '2', '3', '4', '5', '6', '8', '16']
   validate_set_location: "./data/gdgn_64_64_validate/"
-  validate_set_volume: 200
-  validate_batch_size: 100
+  validate_set_volume: 100
+  validate_batch_size: 50
+  validate_set_channels: ['1', '2', '3', '4', '5', '6', '8', '16']
 
-model_name: "cnn"
-tag: ''
+tag: 'B'
 save: true
 gpu_id: 0
 
 iter_head: 0
-epochs: 20
+epochs: 200
 
-lr: 0.001
-momentum: 0.9
-weight_decay: 0.0005
+optim:
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.0005
+
+tv_scale: 0.01
 
 log_dir: "./denoise/logs/"
 checkpoint_dir: "./denoise/checkpoints/"

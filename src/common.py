@@ -1,5 +1,5 @@
 
-from typing import Dict, Any, Iterable
+from typing import Dict, Any, Iterable, Literal
 
 import torch
 from torch import Tensor
@@ -26,6 +26,28 @@ def load_optimizer(config_dict: Dict[str, Any], params: Iterable[Tensor]) -> tor
 def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
     val = - torch.log(y_pred) * y_true - torch.log(1 - y_pred) * (1 - y_true)
     return torch.mean(val)
+
+
+def total_variation(tensor: Tensor,
+                    boundary: Literal['discard', 'circular']='discard') -> Tensor:
+    """
+    Computes the total variation of a given PyTorch tensor.
+
+    Parameters:
+        tensor (Tensor): Input tensor.
+        boundary (str): Boundary options. Supported values are 'discard' and 'circular'.
+
+    Returns:
+        Tensor: Total variation of the input tensor.
+    """
+    result = torch.sum(torch.abs(tensor[..., 1:] - tensor[..., :-1]), dim=-1)
+    if boundary == 'discard':
+        pass
+    elif boundary == 'circular':
+        result += torch.abs(tensor[..., 0] - tensor[..., -1])
+    else:
+        raise ValueError(f'Unsupported boundary: {boundary}')
+    return torch.mean(result)
 
 
 def add_gaussian_noise(tensor: Tensor, std=1.):

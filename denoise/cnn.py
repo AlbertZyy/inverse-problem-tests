@@ -10,7 +10,7 @@ class NoiseExtractCNN(nn.Module):
         NC = n_channels
         NHC = hidden
         kwargs = dict(padding_mode='circular', dtype=float64)
-        self.conv1 = nn.Conv1d(NC, NHC, 3, padding=1, **kwargs)
+        self.conv1 = nn.Conv1d(NC, NHC, 9, padding=4, **kwargs)
         self.conv2 = nn.Conv1d(NHC, NHC, 3, padding=1, **kwargs)
         self.bn12 = nn.BatchNorm1d(NHC, momentum=0.9, dtype=float64)
         self.down = nn.AvgPool1d(kernel_size=2)
@@ -19,7 +19,7 @@ class NoiseExtractCNN(nn.Module):
 
         self.up = nn.ConvTranspose1d(NHC, NHC, 3, 2, 1, 1, dtype=float64)
         self.conv3 = nn.Conv1d(NHC, NHC, 3, padding=1, **kwargs)
-        self.conv4 = nn.Conv1d(NHC, NC, 3, padding=1, **kwargs)
+        self.conv4 = nn.Conv1d(NHC, NC, 9, padding=4, **kwargs)
         self.bn34 = nn.BatchNorm1d(NC, momentum=0.9, dtype=float64)
 
     def forward(self, input):

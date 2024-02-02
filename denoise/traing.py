@@ -154,9 +154,17 @@ def validate(epoch):
         add_multi_std_gaussian_noise(gdgn[:, :, 0, :], noise)
 
         y_out = model(gdgn.reshape(BATCH, CHANNEL*2, BDDOF))
-        loss = loss_fn(y_out, gdgn_ori.reshape(BATCH, CHANNEL*2, BDDOF))
+        y_out = model(gdgn.reshape(BATCH, CHANNEL*2, BDDOF))
+        mse = loss_fn(y_out, gdgn_ori.reshape(BATCH, CHANNEL*2, BDDOF))
+        tv = total_variation(y_out[..., bd_index], boundary='circular')
+        loss = mse + tv * tv_scale
 
-    writer_1.add_scalar('loss(validate)', loss.item(), iter_head + (epoch + 1)*iter_per_epoch)
+    writer_1.add_scalar('mse(validate)', mse.item(),
+                        iter_head + (epoch + 1)*iter_per_epoch)
+    writer_1.add_scalar('tv(validate)', tv.item(),
+                        iter_head + (epoch + 1)*iter_per_epoch)
+    writer_1.add_scalar('loss(validate)', loss.item(),
+                        iter_head + (epoch + 1)*iter_per_epoch)
 
 
 for epoch in trange(0, n_epoch, desc='Training', unit='epoch'):

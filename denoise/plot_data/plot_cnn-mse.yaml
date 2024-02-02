@@ -1,0 +1,26 @@
+
+# 'line' or 'scatter'
+plot_type: 'line'
+
+csv_files:
+  - './denoise/plot_data/run-logs_cnn_B2-tag-mse(train).csv'
+  - './denoise/plot_data/run-logs_cnn_B2-tag-mse(validate).csv'
+
+log: False
+smooth: 0.8
+
+legends:
+  - training
+  - validation
+
+fig_name: 'mse'
+title: 'MSE Loss (noise ~1%, smoothing 0.8)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.03]
+
+show: True
+save: './denoise/plot_data/loss_cnn_B2_mse.png'

@@ -232,6 +232,10 @@ class _TPZLoader():
         self.batch_size = batch_size
         self.sampler = RandomSampler(self.dataset, num_samples=len(self.dataset))
         self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size, drop_last=drop_last)
+        self.reset_iterator()
+
+    def reset_iterator(self):
+        self.__initialized = False
         self._iterator = iter(self.batch_sampler)
         self.__initialized = True
 
@@ -243,6 +247,7 @@ class _TPZLoader():
         return self.dataset.__getitems__(indices)
 
     def __iter__(self):
+        self.reset_iterator()
         return self
 
     def __setattr__(self, attr: str, val: Any) -> None:
@@ -262,13 +267,15 @@ if __name__ == '__main__':
                          device='cpu',
                          pin_memory=False,
                          tqdm=True)
+    loader = dataset.loader(10, drop_last=False)
 
     print(dataset.path)
     print(list(dataset.names_seq))
 
     t1 = time()
 
-    for data, label in dataset.loader(10, drop_last=False):
-        print(data.shape, label.shape)
+    for i in range(3):
+        for data, label in loader:
+            print(data.shape, label.shape)
 
     print(time() - t1)

@@ -35,17 +35,15 @@ n_epoch: int    = config['epochs']
 lr              = config['lr']
 momentum        = config.get('momentum', 0)
 weight_decay    = config.get('weight_decay', 0.0)
-s_trainable     = config['s_trainable']
 NOISE: float    = config.get('noise', 0.0)
-multi_s: bool   = config.get('multi_s', False)
+type_: bool   = config.get('type_', '')
 
 device = torch.device(f'cuda:{GPU_ID}' if torch.cuda.is_available() else 'cpu')
 
 
 ### build model & data set
 
-model, MODEL_NAME = build_model(device, tag=config['tag'], multi_s=multi_s)
-model.df_solver._frac.s.requires_grad_(s_trainable)
+model, MODEL_NAME = build_model(device, tag=config['tag'], type_=type_)
 
 data_conf = config['data']
 # train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'], use_cache=True)
@@ -82,8 +80,7 @@ noise_filter.s.requires_grad_(False)
 ### confirm
 
 print(f'\nStart training {MODEL_NAME} on {device}...')
-print(f"  - s trainable: {s_trainable}")
-print(f"  - multiple s: {multi_s}")
+print(f"  - type: {type_}")
 
 print(f'Total {n_epoch} epochs(iter from {iter_head}), {iter_per_epoch} iterations per epoch.')
 print(f'Training set size: {len(train_dataset)}, noise: {NOISE}.')
@@ -134,6 +131,9 @@ if SAVE:
 def train(epoch: int):
     step = 0
 
+    if epoch == n_epoch//2 and type_ == 'sp':
+        model.df_solver._frac.sparkle()
+
     for gdgn, label in tqdm(train_dataset.loader(data_conf['train_batch_size']),
                             desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
         optim.zero_grad()
@@ -151,12 +151,16 @@ def train(epoch: int):
 
         writer_1.add_scalar('loss(train)', loss.item(),
                             iter_head + epoch*iter_per_epoch + step)
-        if multi_s:
+        if type_ != 'single':
             for i in range(0, 8):
                 writer_1.add_scalar(f's{i}', model.df_solver._frac.s[i].item(),
                                     iter_head + epoch*iter_per_epoch + step)
         else:
             writer_1.add_scalar('s', model.df_solver._frac.s.item(),
+                                iter_head + epoch*iter_per_epoch + step)
+
+        if type_ == 'sp':
+            writer_1.add_scalar('s', model.df_solver._frac.s0.item(),
                                 iter_head + epoch*iter_per_epoch + step)
 
     if SAVE:

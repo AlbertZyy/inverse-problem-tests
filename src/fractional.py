@@ -1,5 +1,5 @@
 
-from typing import Dict, Optional, Callable, Sequence
+from typing import Union, Dict, Optional, Callable, Sequence
 
 from numpy.typing import NDArray
 import torch
@@ -7,42 +7,42 @@ from torch.nn import Parameter, Module, init
 from torch import Tensor, float64, device, relu
 
 
-class Fractional(Module):
-    def __init__(self, n_dofs: int, *, dtype=float64, device: device=None) -> None:
-        super().__init__()
+_dtype = torch.dtype
+_device = torch.device
+
+
+class _EigenvalueBase(Module):
+    n_dofs: int
+    w: Tensor
+    V: Tensor
+    Vinv: Tensor
+
+    def __init__(self, n_dofs: int, *, dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super(_EigenvalueBase, self).__init__()
         kwargs = dict(dtype=dtype, device=device)
         self.n_dofs = n_dofs
-        self.s = Parameter(torch.empty((), **kwargs))
-        self.w = Parameter(torch.empty((n_dofs, ), **kwargs), requires_grad=False)
-        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.reset_parameters()
+        self.register_buffer('w', torch.empty((n_dofs, ), **kwargs))
+        self.register_buffer('V', torch.empty((n_dofs, n_dofs), **kwargs))
+        self.register_buffer('Vinv', torch.empty((n_dofs, n_dofs), **kwargs))
 
-    def reset_parameters(self):
-        init.constant_(self.s, 0.0)
+    def reset_operator(self):
         init.zeros_(self.w)
         init.orthogonal_(self.V)
-        with torch.no_grad():
-            # NOTE: Data should be copied from V.T to Vinv. Otherwise, V will be
-            # overriten by Vinv when loading the state dict.
-            self.Vinv.copy_(self.V.T)
+        # NOTE: Data should be copied from V.T to Vinv. Otherwise, V will be
+        # overriten by Vinv when loading the state dict.
+        self.Vinv.copy_(self.V.T)
 
     def setup(self, w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None):
         assert w.ndim == 1
         assert V.ndim == 2
-        with torch.no_grad():
-            self.w.copy_(w)
-            self.V.copy_(V)
-            if Vinv is None:
-                Vinv = self.V.T
-            self.Vinv.copy_(Vinv)
-
-    def initialize(self, s: float):
-        """
-        @brief Initialize the order of the fractional operator.
-        """
-        with torch.no_grad():
-            init.constant_(self.s, s)
+        self.w.copy_(w)
+        self.V.copy_(V)
+        if Vinv is None:
+            Vinv = self.V.T
+        else:
+            assert Vinv.ndim == 2
+        self.Vinv.copy_(Vinv)
 
     def from_npz(self, filename: str):
         """
@@ -53,8 +53,6 @@ class Fractional(Module):
             - 'v': A 2D tensor containing the eigen functions.
             - 'vinv': A 2D tensor containing the inverse of v, optional.
             - 'M': The 2D mass matrix, satisfying `vinv=v.T@M`, optional. Ignored if `vinv` is provided.
-
-        @param s: float. The order of the operator.
         """
         import numpy as np
         data: Dict[str, NDArray] = dict(np.load(filename))
@@ -71,6 +69,22 @@ class Fractional(Module):
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
+
+class Fractional(_EigenvalueBase):
+    def __init__(self, n_dofs: int, *, dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super().__init__(n_dofs, dtype=dtype, device=device)
+        kwargs = dict(dtype=dtype, device=device)
+        self.s = Parameter(torch.zeros((), **kwargs))
+        self.reset_operator()
+
+    def initialize(self, s: float):
+        """
+        @brief Initialize the order of the fractional operator.
+        """
+        with torch.no_grad():
+            init.constant_(self.s, s)
+
     def matrix(self):
         V = self.V
         Vinv = self.Vinv
@@ -83,11 +97,6 @@ class Fractional(Module):
         return torch.einsum('ik, ...k -> ...i', self.matrix(), gdvn)
 
     def alpha(self, data: Tensor) -> Tensor:
-        """
-        @brief
-
-        @param data: Tensor. [n_channel, n_dof]
-        """
         return torch.einsum('ik, ...k -> ...i', self.Vinv, data)
 
 
@@ -115,14 +124,13 @@ class FractionalWithHighcut(Fractional):
         return V@L@Vinv
 
 
-class MultiChannelFractional(Module):
+class MultiChannelFractional(_EigenvalueBase):
     def __init__(self, n_dofs: int, n_channels: int, *,
                  high_cut: bool=False, hc_slope=2.,
                  dtype=float64, device: device=None) -> None:
-        super().__init__()
+        super().__init__(n_dofs, dtype=dtype, device=device)
         assert n_channels > 0
         kwargs = dict(dtype=dtype, device=device)
-        self.n_dofs = n_dofs
         self.n_channels = n_channels
         self.s = Parameter(torch.empty((n_channels, ), **kwargs))
 
@@ -134,34 +142,13 @@ class MultiChannelFractional(Module):
             self.register_parameter('hc', None)
             self.register_parameter('hc_slope', None)
             self.matrix = self._transform
-
-        self.w = Parameter(torch.empty((n_dofs, ), **kwargs), requires_grad=False)
-        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
+        self.reset_operator()
         self.reset_paramters()
 
     def reset_paramters(self):
         init.constant_(self.s, 0.0)
         if self.hc is not None:
             init.constant_(self.hc, self.w.max().item())
-        init.zeros_(self.w)
-        init.orthogonal_(self.V)
-        with torch.no_grad():
-            # NOTE: Data should be copied from V.T to Vinv. Otherwise, V will be
-            # overriten by Vinv when loading the state dict.
-            self.Vinv.copy_(self.V.T)
-
-    def setup(self, w: Tensor, V: Tensor, Vinv: Optional[Tensor]=None):
-        assert w.ndim == 1
-        assert V.ndim == 2
-        with torch.no_grad():
-            self.w.copy_(w)
-            self.V.copy_(V)
-            if Vinv is None:
-                Vinv = self.V.T
-            else:
-                assert Vinv.ndim == 2
-            self.Vinv.copy_(Vinv)
 
     def initialize(self, s: Sequence[float], hc: Optional[Sequence[float]]=None):
         """
@@ -174,33 +161,6 @@ class MultiChannelFractional(Module):
                 if self.hc is None:
                     raise ValueError("The high cut has been disabled.")
                 self.hc.copy_(torch.tensor(hc, dtype=self.hc.dtype, device=self.hc.device))
-
-    def from_npz(self, filename: str):
-        """
-        @brief Load a fractional operator from a .npz file.
-
-        @param filename: str. The name of the file. The file should contain the following keys:
-            - 'w': A 1D tensor containing the eigen values.
-            - 'v': A 2D tensor containing the eigen functions.
-            - 'vinv': A 2D tensor containing the inverse of v, optional.
-            - 'M': The 2D mass matrix, satisfying `vinv=v.T@M`, optional. Ignored if `vinv` is provided.
-
-        @return: Fractional. The fractional operator.
-        """
-        import numpy as np
-        data: Dict[str, NDArray] = dict(np.load(filename))
-        t_data = {k: torch.from_numpy(v) for k, v in data.items()}
-
-        try:
-            if 'vinv' in t_data:
-                self.setup(t_data['w'], t_data['v'], t_data['vinv'])
-            elif 'M' in t_data:
-                Vinv = t_data['v'].T @ t_data['M']
-                self.setup(t_data['w'], t_data['v'], Vinv)
-            else:
-                self.setup(t_data['w'], t_data['v'])
-        except KeyError:
-            raise KeyError(f"The file '{filename}' does not contain the required data.")
 
     def _transform(self):
         V = self.V
@@ -225,12 +185,122 @@ class MultiChannelFractional(Module):
         return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
 
     def alpha(self, data: Tensor) -> Tensor:
-        """
-        @brief
-
-        @param data: Tensor. [n_channel, n_dof]
-        """
         return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
+
+
+class SparkleFractional(_EigenvalueBase):
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 dtype=float64, device: device=None) -> None:
+        super().__init__(n_dofs, dtype=dtype, device=device)
+        assert n_channels > 0
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_channels = n_channels
+        self.s = Parameter(torch.empty((n_channels, ), **kwargs))
+        self.s0 = Parameter(torch.empty((), **kwargs))
+        self._transform = self._transform_single
+        self.reset_operator()
+        self.reset_paramters()
+
+    def reset_paramters(self):
+        init.constant_(self.s, 0.0)
+        init.constant_(self.s0, 0.0)
+
+    def initialize(self, s: Optional[Sequence[float]]=None, s0: Optional[float]=None):
+        """
+        @brief Initialize the fractional operator order for each channel.
+        """
+        with torch.no_grad():
+            if s is not None:
+                self.s.copy_(torch.tensor(s, dtype=self.s.dtype, device=self.s.device))
+            if s0 is not None:
+                self.s0.fill_(s0)
+
+    def shrink(self):
+        init.constant_(self.s0, self.s.mean().detach().item())
+        self._transform = self._transform_single
+
+    def sparkle(self):
+        init.constant_(self.s, self.s0.detach().item())
+        self._transform = self._transform_multiple
+
+    def _transform_multiple(self, data: Tensor):
+        V = self.V
+        Vinv = self.Vinv
+        lam = self.w[None, :]
+        slope = self.s[:, None]
+        L = torch.pow(lam, slope)
+        return torch.einsum('ij, cj, jk, ...ck -> ...ci', V, L, Vinv, data)
+
+    def _transform_single(self, data: Tensor):
+        V = self.V
+        Vinv = self.Vinv
+        L = torch.pow(self.w, self.s0)
+        return torch.einsum('ij, j, jk, ...k -> ...i', V, L, Vinv, data)
+
+    __call__: Callable[[Tensor], Tensor]
+
+    def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
+        return self._transform(data)
+
+    def alpha(self, data: Tensor) -> Tensor:
+        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
+
+
+class AdaptiveFractional(_EigenvalueBase):
+    weights: Tensor
+    s: Tensor
+
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 momentum: float=0.99,
+                 eps: float=1e-6,
+                 dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super().__init__(n_dofs, dtype=dtype, device=device)
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_channels = n_channels
+        self.momentum = momentum
+        self.eps = eps
+        self.register_buffer('weights', torch.empty((n_dofs, ), **kwargs))
+        self.register_buffer('s', torch.empty((n_channels, ), **kwargs))
+        self.reset_operator()
+        self.reset_running_stats()
+
+    def setup(self, w: Tensor, V: Tensor, Vinv: Optional[Tensor] = None):
+        super().setup(w, V, Vinv)
+        self.reset_running_stats()
+
+    def alpha(self, data: Tensor) -> Tensor:
+        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
+
+    def reset_running_stats(self):
+        self.s.zero_()
+        log_eigen = torch.log10(self.w) # [n_dofs, ]
+        mean_log_eigen = log_eigen.mean() # scalar
+        self.weights.copy_(log_eigen - mean_log_eigen)
+        self.weights.div_(
+            torch.sum((log_eigen - mean_log_eigen)**2) + self.eps
+        )
+
+    def forward(self, data: Tensor):
+        assert data.dim() >= 2
+        alpha = self.alpha(data)
+
+        if self.training:
+            b = self.momentum
+            structure = data.shape[:-2]
+            alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
+            # [N, n_channel, n_dof]
+            log_alpha = alpha_r.abs_().log10_()
+            if len(structure) != 0:
+                log_alpha = log_alpha.mean(dim=0) # [n_channel, n_dof]
+            mean_log_alpha = log_alpha.mean(dim=-1, keepdim=True) # [n_channel, 1]
+            self.s.lerp_((mean_log_alpha - log_alpha)@self.weights, 1-b)
+
+        V = self.V
+        lam = self.w[None, :]
+        slope = self.s[:, None]
+        L = torch.pow(lam, slope)
+        return torch.einsum('...cj, ij, cj -> ...ci', alpha, V, L)
 
 
 class EigenvalueFilter(Module):

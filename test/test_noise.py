@@ -8,7 +8,7 @@ from torch import Tensor
 from fractional import Fractional
 from dataset import TPZDataset
 
-NOISE = 1.7
+NOISE = 0.0084
 EXT = 63
 H = 2./EXT
 

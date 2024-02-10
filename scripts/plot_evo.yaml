@@ -1,0 +1,24 @@
+
+data:
+  - legend_name1:
+    - csv_file: ''
+    - marker: ''
+    - color: ''
+
+smooth: 0.8
+log: False
+
+fig_name: 'loss'
+fig_size: [10, 10]
+title: ''
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.7]
+
+index: [0, 249, 499, 749, 999]
+
+show: True
+save: ''

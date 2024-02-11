@@ -69,6 +69,12 @@ class _EigenvalueBase(Module):
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
+    def alpha(self, space_domain: Tensor) -> Tensor:
+        return torch.einsum('ik, ...k -> ...i', self.Vinv, space_domain)
+
+    def beta(self, eigen_domain: Tensor) -> Tensor:
+        return torch.einsum('ik, ...k -> ...i', self.V, eigen_domain)
+
 
 class Fractional(_EigenvalueBase):
     def __init__(self, n_dofs: int, *, dtype: Optional[_dtype]=float64,
@@ -95,9 +101,6 @@ class Fractional(_EigenvalueBase):
 
     def forward(self, gdvn: Tensor):
         return torch.einsum('ik, ...k -> ...i', self.matrix(), gdvn)
-
-    def alpha(self, data: Tensor) -> Tensor:
-        return torch.einsum('ik, ...k -> ...i', self.Vinv, data)
 
 
 class FractionalWithHighcut(Fractional):
@@ -184,67 +187,6 @@ class MultiChannelFractional(_EigenvalueBase):
     def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
         return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
 
-    def alpha(self, data: Tensor) -> Tensor:
-        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
-
-
-class SparkleFractional(_EigenvalueBase):
-    def __init__(self, n_dofs: int, n_channels: int, *,
-                 dtype=float64, device: device=None) -> None:
-        super().__init__(n_dofs, dtype=dtype, device=device)
-        assert n_channels > 0
-        kwargs = dict(dtype=dtype, device=device)
-        self.n_channels = n_channels
-        self.s = Parameter(torch.empty((n_channels, ), **kwargs))
-        self.s0 = Parameter(torch.empty((), **kwargs))
-        self._transform = self._transform_single
-        self.reset_operator()
-        self.reset_paramters()
-
-    def reset_paramters(self):
-        init.constant_(self.s, 0.0)
-        init.constant_(self.s0, 0.0)
-
-    def initialize(self, s: Optional[Sequence[float]]=None, s0: Optional[float]=None):
-        """
-        @brief Initialize the fractional operator order for each channel.
-        """
-        with torch.no_grad():
-            if s is not None:
-                self.s.copy_(torch.tensor(s, dtype=self.s.dtype, device=self.s.device))
-            if s0 is not None:
-                self.s0.fill_(s0)
-
-    def shrink(self):
-        init.constant_(self.s0, self.s.mean().detach().item())
-        self._transform = self._transform_single
-
-    def sparkle(self):
-        init.constant_(self.s, self.s0.detach().item())
-        self._transform = self._transform_multiple
-
-    def _transform_multiple(self, data: Tensor):
-        V = self.V
-        Vinv = self.Vinv
-        lam = self.w[None, :]
-        slope = self.s[:, None]
-        L = torch.pow(lam, slope)
-        return torch.einsum('ij, cj, jk, ...ck -> ...ci', V, L, Vinv, data)
-
-    def _transform_single(self, data: Tensor):
-        V = self.V
-        Vinv = self.Vinv
-        L = torch.pow(self.w, self.s0)
-        return torch.einsum('ij, j, jk, ...k -> ...i', V, L, Vinv, data)
-
-    __call__: Callable[[Tensor], Tensor]
-
-    def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
-        return self._transform(data)
-
-    def alpha(self, data: Tensor) -> Tensor:
-        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
-
 
 class AdaptiveFractional(_EigenvalueBase):
     weights: Tensor
@@ -268,9 +210,6 @@ class AdaptiveFractional(_EigenvalueBase):
     def setup(self, w: Tensor, V: Tensor, Vinv: Optional[Tensor] = None):
         super().setup(w, V, Vinv)
         self.reset_running_stats()
-
-    def alpha(self, data: Tensor) -> Tensor:
-        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, data)
 
     def reset_running_stats(self):
         self.s.zero_()
@@ -363,3 +302,54 @@ class EigenvalueFilter(Module):
         return torch.einsum('ik, ...ck -> ...ci', self.Vinv, __func_data)
 
     forward = direct
+
+
+### Double fractional modules ###
+
+class SparkleFractional(AdaptiveFractional):
+    weights: Tensor
+    s: Tensor
+    t: Tensor
+
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 momentum: float=0.99,
+                 eps: float=1e-6,
+                 dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super().__init__(n_dofs, n_channels, momentum=momentum, eps=eps,
+                         dtype=dtype, device=device)
+        kwargs = dict(dtype=dtype, device=device)
+        self.t = Parameter(torch.empty((n_channels, ), **kwargs))
+        self.reset_paramters()
+
+    def reset_paramters(self):
+        init.constant_(self.t, 0.0)
+
+    def initialize(self, t: Sequence[float]):
+        """
+        @brief Initialize the fractional operator order and the eigen value highcut\
+               for each channel.
+        """
+        with torch.no_grad():
+            self.t.copy_(torch.tensor(t, dtype=self.s.dtype, device=self.s.device))
+
+    def forward(self, data: Tensor):
+        assert data.dim() >= 2
+        alpha = self.alpha(data)
+
+        if self.training:
+            b = self.momentum
+            structure = data.shape[:-2]
+            alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
+            # [N, n_channel, n_dof]
+            log_alpha = alpha_r.abs_().log10_()
+            if len(structure) != 0:
+                log_alpha = log_alpha.mean(dim=0) # [n_channel, n_dof]
+            mean_log_alpha = log_alpha.mean(dim=-1, keepdim=True) # [n_channel, 1]
+            self.s.lerp_((mean_log_alpha - log_alpha)@self.weights, 1-b)
+
+        V = self.V
+        lam = self.w[None, :]
+        slope = self.s[:, None] + self.t[:, None]
+        L = torch.pow(lam, slope)
+        return torch.einsum('...cj, ij, cj -> ...ci', alpha, V, L)

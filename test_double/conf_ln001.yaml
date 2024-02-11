@@ -9,17 +9,17 @@ data:
 
 gpu_id: 0
 
-noise: 0.42
-tag: 'n042_multi'
+noise: 0.0084
+tag: 'ln001_sp'
 type_: ''
 
-iter_head: 0
-epochs: 1000
+iter_head: 20000
+epochs: 500
 
 lr: 0.001
 weight_decay: 0.000000001
 momentum: 0.9
 
-log_dir: "./test_sp_ad/logs/"
+log_dir: "./test_double/logs/"
 save: True
-checkpoint_dir: "./test_sp_ad/checkpoints/"
+checkpoint_dir: "./test_double/checkpoints/"

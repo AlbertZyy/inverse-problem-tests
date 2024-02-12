@@ -80,6 +80,10 @@ axes.set_xlim(*lim_args, **lim_kwargs)
 lim_args, lim_kwargs = set_lim(config.get('ylim', 'auto'))
 axes.set_ylim(*lim_args, **lim_kwargs)
 
+if lim_args:
+    if 'ytick_num' in config.keys():
+        axes.set_yticks(np.linspace(*lim_args, num=config['ytick_num']))
+
 if config['save']:
     fig.savefig(config['save'])
 

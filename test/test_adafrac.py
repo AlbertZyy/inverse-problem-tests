@@ -10,14 +10,14 @@ from fractional import AdaptiveFractional, Fractional
 from data_feature import MultiChannelDataFeature
 from dataset import NPZDataset
 
-NOISE = 0.42
+NOISE = 0.01
 EXT = 63
 H = 2./EXT
 
-noise_filter = Fractional(252)
-noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
-noise_filter.initialize(s=-0.75)
-noise_filter.s.requires_grad_(False)
+# noise_filter = Fractional(252)
+# noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
+# noise_filter.initialize(s=-0.75)
+# noise_filter.s.requires_grad_(False)
 frac = AdaptiveFractional(252, 8, momentum=0.9)
 frac.from_npz(r"./data/laplace_beltrami_63_63.npz")
 df = MultiChannelDataFeature.from_domain([EXT, EXT], [H, H], frac)
@@ -30,7 +30,7 @@ s_list = []
 for epoch in trange(4):
     for data, _ in tqdm(loader, desc=f"Epoch {epoch+1}", leave=False):
         noise = torch.randn_like(data[:, :, 0, :]) * NOISE
-        noise = noise_filter(noise)
+        # noise = noise_filter(noise)
         noise = data[:, :, 0, :] * noise
         data[:, :, 0, :] += noise
         gnvn = df.gd2gn_diff(data)

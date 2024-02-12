@@ -10,7 +10,7 @@ from data_feature import MultiChannelDataFeature
 from dataset import NPZDataset
 from common import add_gaussian_noise
 
-NOISE = 0.42
+NOISE = 0.01
 EXT = 63
 H = 2./EXT
 
@@ -20,18 +20,18 @@ df = MultiChannelDataFeature.from_domain([EXT, EXT], [H, H], frac)
 
 # 20% - 391.72
 # 50% - 2448.27
-frac.initialize(s=[0.45, ]*8)
+frac.initialize(s=[-0.25, ]*8)
 
 dataset = NPZDataset(r"./data/gdgn_64_64_train", 100)
 gdgn = dataset[48][0]
 
 # add_gaussian_noise(gdgn[:, 0, :], NOISE)
-noise_filter = Fractional(252)
-noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
-noise_filter.initialize(s=-0.75)
-noise_filter.s.requires_grad_(False)
+# noise_filter = Fractional(252)
+# noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
+# noise_filter.initialize(s=-0.75)
+# noise_filter.s.requires_grad_(False)
 noise = torch.randn_like(gdgn[:, 0, :]) * NOISE
-noise = noise_filter(noise)
+# noise = noise_filter(noise)
 noise = gdgn[:, 0, :] * noise
 gdgn[:, 0, :] += noise
 

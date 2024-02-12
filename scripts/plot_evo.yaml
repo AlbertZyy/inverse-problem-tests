@@ -17,6 +17,7 @@ ylabel: 'loss'
 
 xlim: 'auto'
 ylim: [0.0, 0.7]
+ytick_num: 5
 
 index: [0, 249, 499, 749, 999]
 

@@ -24,11 +24,17 @@ data:
     linestyle: '-'
     color: 'b'
 
+  Sparkle:
+    csv_file: '.\test_double\plot_data\run-u100_ln001_sp-tag-loss_validate_.csv'
+    marker: '*'
+    linestyle: '-'
+    color: 'y'
+
 smooth: 0.9
 log: False
 
 fig_name: 'loss'
-fig_size: [8, 6]
+fig_size: [12, 9]
 title: 'Validation loss on 0.1% low-freq noise'
 
 xlabel: 'iteration'
@@ -36,6 +42,7 @@ ylabel: 'loss'
 
 xlim: 'auto'
 ylim: [0.0, 0.1]
+ytick_num: 11
 
 index: [0, 124, 249, 374, 499, 624, 749, 874, 999]
 

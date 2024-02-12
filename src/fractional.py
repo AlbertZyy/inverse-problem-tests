@@ -1,5 +1,6 @@
 
 from typing import Union, Dict, Optional, Callable, Sequence
+from math import log
 
 from numpy.typing import NDArray
 import torch
@@ -193,6 +194,7 @@ class AdaptiveFractional(_EigenvalueBase):
     s: Tensor
 
     def __init__(self, n_dofs: int, n_channels: int, *,
+                 weight: Optional[bool]=True,
                  momentum: float=0.99,
                  eps: float=1e-6,
                  dtype: Optional[_dtype]=float64,
@@ -200,40 +202,56 @@ class AdaptiveFractional(_EigenvalueBase):
         super().__init__(n_dofs, dtype=dtype, device=device)
         kwargs = dict(dtype=dtype, device=device)
         self.n_channels = n_channels
+        self.enable_weight = weight
         self.momentum = momentum
         self.eps = eps
         self.register_buffer('weights', torch.empty((n_dofs, ), **kwargs))
         self.register_buffer('s', torch.empty((n_channels, ), **kwargs))
         self.reset_operator()
-        self.reset_running_stats()
+        self.reset_running_stats(weight)
 
     def setup(self, w: Tensor, V: Tensor, Vinv: Optional[Tensor] = None):
         super().setup(w, V, Vinv)
-        self.reset_running_stats()
+        self.reset_running_stats(self.enable_weight)
 
-    def reset_running_stats(self):
+    def reset_running_stats(self, enable_weight: bool):
         self.s.zero_()
         log_eigen = torch.log10(self.w) # [n_dofs, ]
-        mean_log_eigen = log_eigen.mean() # scalar
-        self.weights.copy_(log_eigen - mean_log_eigen)
-        self.weights.div_(
-            torch.sum((log_eigen - mean_log_eigen)**2) + self.eps
-        )
+        log_eigen = log_eigen - log_eigen.mean() # scalar
+
+        if enable_weight:
+            weight = 1/(self.w*log(10))
+            weight.sqrt_()
+            W = torch.outer(weight, weight)
+
+            self.weights.copy_(W@log_eigen)
+            self.weights.div_(
+                log_eigen@W@log_eigen + self.eps
+            )
+
+        else:
+            self.weights.copy_(log_eigen)
+            self.weights.div_(
+                torch.sum(log_eigen**2) + self.eps
+            )
+
+    def update(self, alpha: Tensor):
+        b = self.momentum
+        structure = alpha.shape[:-2]
+        alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
+        # [N, n_channel, n_dof]
+        log_alpha = alpha_r.abs_().log10_()
+        if len(structure) != 0:
+            log_alpha = log_alpha.mean(dim=0) # [n_channel, n_dof]
+        mean_log_alpha = log_alpha.mean(dim=-1, keepdim=True) # [n_channel, 1]
+        self.s.lerp_((mean_log_alpha - log_alpha)@self.weights, 1-b)
 
     def forward(self, data: Tensor):
         assert data.dim() >= 2
         alpha = self.alpha(data)
 
         if self.training:
-            b = self.momentum
-            structure = data.shape[:-2]
-            alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
-            # [N, n_channel, n_dof]
-            log_alpha = alpha_r.abs_().log10_()
-            if len(structure) != 0:
-                log_alpha = log_alpha.mean(dim=0) # [n_channel, n_dof]
-            mean_log_alpha = log_alpha.mean(dim=-1, keepdim=True) # [n_channel, 1]
-            self.s.lerp_((mean_log_alpha - log_alpha)@self.weights, 1-b)
+            self.update(alpha)
 
         V = self.V
         lam = self.w[None, :]
@@ -312,11 +330,13 @@ class SparkleFractional(AdaptiveFractional):
     t: Tensor
 
     def __init__(self, n_dofs: int, n_channels: int, *,
+                 weight: Optional[bool]=True,
                  momentum: float=0.99,
                  eps: float=1e-6,
                  dtype: Optional[_dtype]=float64,
                  device: Union[_device, str, None]=None) -> None:
-        super().__init__(n_dofs, n_channels, momentum=momentum, eps=eps,
+        super().__init__(n_dofs, n_channels, weight=weight,
+                         momentum=momentum, eps=eps,
                          dtype=dtype, device=device)
         kwargs = dict(dtype=dtype, device=device)
         self.t = Parameter(torch.empty((n_channels, ), **kwargs))
@@ -338,15 +358,7 @@ class SparkleFractional(AdaptiveFractional):
         alpha = self.alpha(data)
 
         if self.training:
-            b = self.momentum
-            structure = data.shape[:-2]
-            alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
-            # [N, n_channel, n_dof]
-            log_alpha = alpha_r.abs_().log10_()
-            if len(structure) != 0:
-                log_alpha = log_alpha.mean(dim=0) # [n_channel, n_dof]
-            mean_log_alpha = log_alpha.mean(dim=-1, keepdim=True) # [n_channel, 1]
-            self.s.lerp_((mean_log_alpha - log_alpha)@self.weights, 1-b)
+            self.update(alpha)
 
         V = self.V
         lam = self.w[None, :]

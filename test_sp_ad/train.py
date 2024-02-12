@@ -33,10 +33,11 @@ GPU_ID          = config['gpu_id']
 iter_head: int  = config['iter_head']
 n_epoch: int    = config['epochs']
 lr              = config['lr']
-momentum        = config.get('momentum', 0)
-weight_decay    = config.get('weight_decay', 0.0)
-NOISE: float    = config.get('noise', 0.0)
-type_: bool   = config.get('type_', '')
+momentum               = config.get('momentum', 0)
+weight_decay           = config.get('weight_decay', 0.0)
+NOISE: float           = config.get('noise', 0.0)
+use_noise_filter: bool = config.get('use_noise_filter', False)
+type_: bool            = config.get('type_', '')
 
 device = torch.device(f'cuda:{GPU_ID}' if torch.cuda.is_available() else 'cpu')
 
@@ -72,10 +73,13 @@ validate_dataset = TPZDataset(
 iter_per_epoch, remander = divmod(len(train_dataset), data_conf['train_batch_size'])
 assert remander == 0
 
-noise_filter = Fractional(252, device=device)
-noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
-noise_filter.initialize(s=-0.75)
-noise_filter.s.requires_grad_(False)
+if use_noise_filter:
+    noise_filter = Fractional(252, device=device)
+    noise_filter.from_npz(r"./data/laplace_beltrami_63_63.npz")
+    noise_filter.initialize(s=-0.75)
+    noise_filter.s.requires_grad_(False)
+else:
+    noise_filter = None
 
 ### confirm
 
@@ -83,8 +87,9 @@ print(f'\nStart training {MODEL_NAME} on {device}...')
 print(f"  - type: {type_}")
 
 print(f'Total {n_epoch} epochs(iter from {iter_head}), {iter_per_epoch} iterations per epoch.')
-print(f'Training set size: {len(train_dataset)}, noise: {NOISE}.')
+print(f'Training set size: {len(train_dataset)}.')
 print(f'Validation set size: {len(validate_dataset)}.', end='\n\n')
+print(f"NOISE: {NOISE}, filter: {use_noise_filter}.")
 print("Train(SGD) setup:")
 print(f"  - learning rate: {lr}")
 print(f"  - momentum: {momentum}")
@@ -136,7 +141,8 @@ def train(epoch: int):
         optim.zero_grad()
 
         noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
-        noise = noise_filter(noise)
+        if noise_filter:
+            noise = noise_filter(noise)
         noise = gdgn[:, :, 0, :] * noise
         gdgn[:, :, 0, :] += noise
 
@@ -158,10 +164,6 @@ def train(epoch: int):
             writer_1.add_scalar('s', model.df_solver._frac.s.item(),
                                 iter_head + (epoch+1)*iter_per_epoch)
 
-        if type_ == 'sp':
-            writer_1.add_scalar('s', model.df_solver._frac.s0.item(),
-                                iter_head + (epoch+1)*iter_per_epoch)
-
     if SAVE:
         torch.save(model.state_dict(), checkpoint_path)
 
@@ -171,7 +173,8 @@ def validate(epoch):
     with torch.no_grad():
 
         noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
-        noise = noise_filter(noise)
+        if noise_filter:
+            noise = noise_filter(noise)
         noise = gdgn[:, :, 0, :] * noise
         gdgn[:, :, 0, :] += noise
 

@@ -19,7 +19,7 @@ class ConvBlock(nn.Module):
         in_, out_ = in_channel, out_channel
         self.conv_1 = nn.Conv2d(in_, out_, kernel, padding=kernel//2, dtype=dtype) # [N, 10, 64, 64]
         self.conv_2 = nn.Conv2d(out_, out_, kernel, padding=kernel//2, bias=False, dtype=dtype) # [N, 10, 64, 64]
-        self.bn = nn.BatchNorm2d(out_, momentum=0.9, dtype=dtype)
+        self.bn = nn.BatchNorm2d(out_, momentum=0.01, dtype=dtype)
         self.down = nn.AvgPool2d(kernel_size=2) # [N, 10, 32, 32]
 
     def forward(self, phi: Tensor):
@@ -37,7 +37,7 @@ class ConvTBlock(nn.Module):
         self.up = nn.ConvTranspose2d(in_, in_//2, 3, 2, 1, 1, dtype=dtype)
         self.convt_1 = nn.ConvTranspose2d(in_, out_, kernel, padding=kernel//2, dtype=dtype)
         self.convt_2 = nn.ConvTranspose2d(out_, out_, kernel, padding=kernel//2, bias=False, dtype=dtype)
-        self.bn = nn.BatchNorm2d(out_, momentum=0.9, dtype=dtype)
+        self.bn = nn.BatchNorm2d(out_, momentum=0.01, dtype=dtype)
 
     def forward(self, phi: Tensor, conn: Tensor):
         phi = self.up(phi)
@@ -97,7 +97,7 @@ class RevModel(nn.Module):
                  *, network_dtype=float32) -> None:
         super().__init__()
         self.df_solver = MultiChannelDataFeature(lsolver, frac) # [N, 16, 64, 64]
-        self.bn = nn.BatchNorm2d(n_channel, momentum=0.9, dtype=lsolver.dtype)
+        self.bn = nn.BatchNorm2d(n_channel, momentum=0.01, dtype=lsolver.dtype)
         self.coordinate = lsolver.indexing.coordinate([-1, -1]) # [2, 64, 64]
         self.unet = Unet(n_channel+2, dtype=network_dtype)
         self.network_dtype = network_dtype
@@ -124,7 +124,7 @@ def build_model(device: device, tag: str):
     H = 2./EXT
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
-    frac = SparkleFractional(252, 8, momentum=0.999, device=device)
+    frac = SparkleFractional(252, 8, device=device)
     frac.from_npz(f"./data/laplace_beltrami_{EXT}_{EXT}.npz")
 
     model = RevModel(8, lsolver, frac, network_dtype=float32)

@@ -224,7 +224,7 @@ class AdaptiveFractional(_EigenvalueBase):
             weight.sqrt_()
             W = torch.outer(weight, weight)
 
-            self.weights.copy_(W@log_eigen)
+            torch.matmul(W, log_eigen, out=self.weights)
             self.weights.div_(
                 log_eigen@W@log_eigen + self.eps
             )
@@ -324,44 +324,39 @@ class EigenvalueFilter(Module):
 
 ### Double fractional modules ###
 
-class SparkleFractional(AdaptiveFractional):
-    weights: Tensor
-    s: Tensor
-    t: Tensor
-
+class SparkleFractional(_EigenvalueBase):
     def __init__(self, n_dofs: int, n_channels: int, *,
-                 weight: Optional[bool]=True,
-                 momentum: float=0.99,
-                 eps: float=1e-6,
                  dtype: Optional[_dtype]=float64,
                  device: Union[_device, str, None]=None) -> None:
-        super().__init__(n_dofs, n_channels, weight=weight,
-                         momentum=momentum, eps=eps,
-                         dtype=dtype, device=device)
+        super().__init__(n_dofs, dtype=dtype, device=device)
         kwargs = dict(dtype=dtype, device=device)
-        self.t = Parameter(torch.empty((n_channels, ), **kwargs))
-        self.reset_paramters()
+        self.s0 = Parameter(torch.empty((), **kwargs))
+        self.s1 = Parameter(torch.empty((n_channels, ), **kwargs))
+        self.reset_operator()
+        self.reset_parameters()
 
-    def reset_paramters(self):
-        init.constant_(self.t, 0.0)
+    def reset_parameters(self) -> None:
+        init.constant_(self.s0, 0.)
+        init.constant_(self.s1, 0.)
 
-    def initialize(self, t: Sequence[float]):
-        """
-        @brief Initialize the fractional operator order and the eigen value highcut\
-               for each channel.
-        """
+    @property
+    def s(self) -> Tensor:
+        return self.s0 + self.s1
+
+    def update(self):
         with torch.no_grad():
-            self.t.copy_(torch.tensor(t, dtype=self.s.dtype, device=self.s.device))
+            self.s0.add_(self.s1.mean())
+            self.s1.sub_(self.s1.mean())
 
-    def forward(self, data: Tensor):
-        assert data.dim() >= 2
-        alpha = self.alpha(data)
-
-        if self.training:
-            self.update(alpha)
-
+    def matrix(self):
         V = self.V
+        Vinv = self.Vinv
         lam = self.w[None, :]
-        slope = self.s[:, None] + self.t[:, None]
+        slope = self.s[:, None]
         L = torch.pow(lam, slope)
-        return torch.einsum('...cj, ij, cj -> ...ci', alpha, V, L)
+        return torch.einsum('ij, cj, jk -> cik', V, L, Vinv)
+
+    def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
+        if self.training:
+            self.update()
+        return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)

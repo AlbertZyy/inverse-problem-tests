@@ -9,7 +9,7 @@ import torch.nn as nn
 sys.path.append("./src")
 
 from fdm import LaplaceFDMSolver
-from fractional import SparkleFractional, AdaptiveFractional, Fractional, MultiChannelFractional
+from fractional import StackedFractional, RegressiveFractional, Fractional, MultiChannelFractional
 from data_feature import MultiChannelDataFeature
 
 
@@ -125,9 +125,9 @@ def build_model(device: device, tag: str, type_: str):
 
     lsolver = LaplaceFDMSolver([EXT, EXT], [H, H], device=device)
     if type_ == 'sp':
-        frac = SparkleFractional(252, 8, device=device)
+        frac = StackedFractional(252, 8, device=device)
     elif type_ == 'ad':
-        frac = AdaptiveFractional(252, 8, device=device)
+        frac = RegressiveFractional(252, 8, device=device)
     elif type_ == 'single':
         frac = Fractional(252, device=device)
     elif type_ == 'sng':

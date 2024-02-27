@@ -5,11 +5,12 @@ from math import log
 from numpy.typing import NDArray
 import torch
 from torch.nn import Parameter, Module, init
-from torch import Tensor, float64, device, relu
+from torch import float64, device, relu
 
 
 _dtype = torch.dtype
 _device = torch.device
+Tensor = torch.Tensor
 
 
 class _EigenvalueBase(Module):
@@ -189,7 +190,7 @@ class MultiChannelFractional(_EigenvalueBase):
         return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
 
 
-class AdaptiveFractional(_EigenvalueBase):
+class RegressiveFractional(_EigenvalueBase):
     weights: Tensor
     s: Tensor
 
@@ -260,71 +261,60 @@ class AdaptiveFractional(_EigenvalueBase):
         return torch.einsum('...cj, ij, cj -> ...ci', alpha, V, L)
 
 
-class EigenvalueFilter(Module):
-    def __init__(self, n_channels: int, n_dofs: int, *, dtype=float64, device: device=None) -> None:
-        super().__init__()
-        assert n_channels >= 1
-        assert n_dofs >= 2
+class EigenNorm(_EigenvalueBase):
+    gain: Tensor
+
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 aggregate: str='max',
+                 momentum: float=0.99,
+                 eps: float=1e-6,
+                 dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super().__init__(n_dofs, dtype=dtype, device=device)
         kwargs = dict(dtype=dtype, device=device)
         self.n_channels = n_channels
-        self.n_dofs = n_dofs
-        self.V = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.Vinv = Parameter(torch.empty((n_dofs, n_dofs), **kwargs), requires_grad=False)
-        self.reset_parameters()
+        if aggregate not in ('max', 'mean'):
+            raise ValueError(f"Unknown aggregate method: {aggregate}")
+        self.aggregate = aggregate
+        self.momentum = momentum
+        self.eps = eps
+        self.register_buffer('gain', torch.empty((n_channels, n_dofs), **kwargs))
+        self.reset_operator()
+        self.reset_running_stats()
 
-    def reset_parameters(self) -> None:
+    def reset_running_stats(self) -> None:
         init.zeros_(self.gain)
-        init.orthogonal_(self.V)
-        with torch.no_grad():
-            self.Vinv.copy_(self.V.T)
 
-    def setup(self, v: Tensor, vinv: Optional[Tensor]=None, *, non_blocking=False):
-        kwargs = dict(non_blocking=non_blocking)
-        with torch.no_grad():
-            self.V.copy_(v, **kwargs)
-
-        if vinv is None:
-            self.Vinv.copy_(self.V.T, **kwargs)
+    def update(self, alpha: Tensor) -> None:
+        b = self.momentum
+        alpha_r = alpha.view(-1, self.n_channels, self.n_dofs).contiguous()
+        # [N, n_channel, n_dof]
+        log_alpha = alpha_r.abs_().log10_()
+        if self.aggregate == 'max':
+            aggregated = log_alpha.max(dim=0, keepdim=False)[0]
+        elif self.aggregate == 'mean':
+            aggregated = log_alpha.mean(dim=0, keepdim=False) # [n_channel, n_dof]
         else:
-            self.Vinv.copy_(vinv, **kwargs)
-
-    def from_npz(self, filename: str) -> None:
-        import numpy as np
-        data: Dict[str, NDArray] = dict(np.load(filename))
-        t_data = {k: torch.from_numpy(v) for k, v in data.items()}
-        del data
-
-        try:
-            if 'vinv' in t_data:
-                self.setup(t_data['v'], t_data['vinv'])
-            elif 'M' in t_data:
-                Vinv = t_data['v'].T @ t_data['M']
-                self.setup(t_data['v'], Vinv)
-            else:
-                self.setup(t_data['v'])
-        except KeyError:
-            raise KeyError(f"The file '{filename}' does not contain the required data.")
+            raise NotImplementedError(f"Unknown aggregate method: {self.aggregate}")
+        self.gain.lerp_(-aggregated, 1-b)
 
     __call__: Callable[[Tensor], Tensor]
 
-    def inverse(self, __eigenfunc_coef: Tensor) -> Tensor:
-        """
-        @brief Map from the eigenfunction domain.
-        """
-        return torch.einsum('ik, ...ck -> ...ci', self.V, __eigenfunc_coef)
+    def forward(self, data: Tensor) -> Tensor:
+        assert data.dim() >= 2
+        alpha = self.alpha(data)
 
-    def direct(self, __func_data: Tensor) -> Tensor:
-        """
-        @brief Map to the eigenfunction domain.
-        """
-        return torch.einsum('ik, ...ck -> ...ci', self.Vinv, __func_data)
+        if self.training:
+            self.update(alpha)
 
-    forward = direct
+        V = self.V
+        L = torch.pow(10., self.gain)
+        return torch.einsum('...cj, ij, cj -> ...ci', alpha, V, L)
 
 
 ### Double fractional modules ###
 
-class SparkleFractional(_EigenvalueBase):
+class StackedFractional(_EigenvalueBase):
     def __init__(self, n_dofs: int, n_channels: int, *,
                  dtype: Optional[_dtype]=float64,
                  device: Union[_device, str, None]=None) -> None:

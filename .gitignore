@@ -149,4 +149,4 @@ data/
 *.png
 
 # CSV file
-*.csv
+# *.csv

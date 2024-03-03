@@ -71,11 +71,11 @@ class _EigenvalueBase(Module):
         except KeyError:
             raise KeyError(f"The file '{filename}' does not contain the required data.")
 
-    def alpha(self, space_domain: Tensor) -> Tensor:
-        return torch.einsum('ik, ...k -> ...i', self.Vinv, space_domain)
+    def decompose(self, function: Tensor) -> Tensor:
+        return torch.einsum('ik, ...k -> ...i', self.Vinv, function)
 
-    def beta(self, eigen_domain: Tensor) -> Tensor:
-        return torch.einsum('ik, ...k -> ...i', self.V, eigen_domain)
+    def reconstruct(self, eigen_coef: Tensor) -> Tensor:
+        return torch.einsum('ik, ...k -> ...i', self.V, eigen_coef)
 
 
 class Fractional(_EigenvalueBase):
@@ -249,7 +249,7 @@ class RegressiveFractional(_EigenvalueBase):
 
     def forward(self, data: Tensor):
         assert data.dim() >= 2
-        alpha = self.alpha(data)
+        alpha = self.decompose(data)
 
         if self.training:
             self.update(alpha)
@@ -302,7 +302,7 @@ class EigenNorm(_EigenvalueBase):
 
     def forward(self, data: Tensor) -> Tensor:
         assert data.dim() >= 2
-        alpha = self.alpha(data)
+        alpha = self.decompose(data)
 
         if self.training:
             self.update(alpha)
@@ -350,3 +350,54 @@ class StackedFractional(_EigenvalueBase):
         if self.training:
             self.update()
         return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
+
+
+### Loss functions ###
+
+class RegressionLoss():
+    x: Tensor
+    weight: Tensor
+
+    def __init__(self, n_dofs: int, n_channels: int, *,
+                 weight=True,
+                 dtype: Optional[_dtype]=float64,
+                 device: Union[_device, str, None]=None) -> None:
+        super().__init__()
+        kwargs = dict(dtype=dtype, device=device)
+        self.n_dofs = n_dofs
+        self.n_channels = n_channels
+        self.enable_weight = weight
+        self.register_buffer('x', torch.empty((n_dofs, ), **kwargs))
+        self.register_buffer('weight', torch.empty((n_channels, n_dofs), **kwargs))
+
+    def reset(self, w: Tensor) -> None:
+        assert w.dim() == 1 and w.shape[0] == self.n_dofs
+        log_eigen = torch.log10(w)
+        self.x.copy_(log_eigen)
+
+        if self.enable_weight:
+            self.weight.copy_(1/(w*log(10)))
+            self.weight.div_(self.weight.sum(dim=-1, keepdim=True))
+        else:
+            self.weight.fill_(1./self.n_dofs)
+
+    def from_npz(self):
+        pass
+
+    # NOTE: shape of s: [channel, ] or []
+    # shape of coef: [..., channel, dof]
+    def forward(self, s: Tensor, coef: Tensor):
+        log_coef = coef.abs_().log10_() # [..., channel, dof]
+        log_coef = log_coef.view(-1, self.n_channels, self.n_dofs) # [N, channel, dof]
+        mean_x = self.x.mean()
+        if s.ndim == 0:
+            pred_mean_y = s * (self.x - mean_x) + mean_x # [dof, ]
+        elif s.ndim == 1:
+            assert s.shape[0] == self.n_channels
+            pred_mean_y = s[:, None] * (self.x - mean_x)[None, :] + mean_x[None, :] # [channel, dof]
+        else:
+            raise ValueError(f"Invalid shape of s: {s.shape}")
+
+        loss = (log_coef - pred_mean_y[None, :, :]).square() # [N, channel, dof]
+        loss = torch.einsum('nch, h -> nc', loss, self.weight)
+        return loss.mean()

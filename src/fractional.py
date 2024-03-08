@@ -5,12 +5,16 @@ from math import log
 from numpy.typing import NDArray
 import torch
 from torch.nn import Parameter, Module, init
+from torch.nn import functional as F
 from torch import float64, device, relu
 
 
 _dtype = torch.dtype
 _device = torch.device
 Tensor = torch.Tensor
+Index = Union[int, Tensor, Sequence[int], slice]
+
+_S = slice(None, None, None)
 
 
 class _EigenvalueBase(Module):
@@ -130,13 +134,14 @@ class FractionalWithHighcut(Fractional):
 
 
 class MultiChannelFractional(_EigenvalueBase):
-    def __init__(self, n_dofs: int, n_channels: int, *,
+    def __init__(self, n_dofs: int, n_channels: int, *, ch_index: Index=_S,
                  high_cut: bool=False, hc_slope=2.,
                  dtype=float64, device: device=None) -> None:
         super().__init__(n_dofs, dtype=dtype, device=device)
         assert n_channels > 0
         kwargs = dict(dtype=dtype, device=device)
         self.n_channels = n_channels
+        self.ch_index = ch_index
         self.s = Parameter(torch.empty((n_channels, ), **kwargs))
 
         if high_cut:
@@ -171,7 +176,9 @@ class MultiChannelFractional(_EigenvalueBase):
         V = self.V
         Vinv = self.Vinv
         lam = self.w[None, :]
-        slope = self.s[:, None]
+        switch = torch.zeros_like(self.s, requires_grad=False)
+        switch[self.ch_index] = 1.0
+        slope = (self.s * switch)[:, None]
         L = torch.pow(lam, slope)
         return torch.einsum('ij, cj, jk -> cik', V, L, Vinv)
 
@@ -179,8 +186,8 @@ class MultiChannelFractional(_EigenvalueBase):
         V = self.V
         Vinv = self.Vinv
         lam = self.w[None, :]
-        hc = self.hc[:, None]
-        slope = self.s[:, None]
+        hc = self.hc[self.ch_index, None]
+        slope = self.s[self.ch_index, None]
         L = torch.pow(lam, slope) * torch.pow(relu(lam/hc - 1) + 1, -self.hc_slope)
         return torch.einsum('ij, cj, jk -> cik', V, L, Vinv)
 

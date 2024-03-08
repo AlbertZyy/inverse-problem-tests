@@ -361,7 +361,7 @@ class StackedFractional(_EigenvalueBase):
 
 ### Loss functions ###
 
-class RegressionLoss():
+class RegressionLoss(Module):
     x: Tensor
     weight: Tensor
 
@@ -375,12 +375,11 @@ class RegressionLoss():
         self.n_channels = n_channels
         self.enable_weight = weight
         self.register_buffer('x', torch.empty((n_dofs, ), **kwargs))
-        self.register_buffer('weight', torch.empty((n_channels, n_dofs), **kwargs))
+        self.register_buffer('weight', torch.empty((n_dofs, ), **kwargs))
 
     def reset(self, w: Tensor) -> None:
         assert w.dim() == 1 and w.shape[0] == self.n_dofs
-        log_eigen = torch.log10(w)
-        self.x.copy_(log_eigen)
+        self.x.copy_(torch.log10(w))
 
         if self.enable_weight:
             self.weight.copy_(1/(w*log(10)))
@@ -388,23 +387,29 @@ class RegressionLoss():
         else:
             self.weight.fill_(1./self.n_dofs)
 
-    def from_npz(self):
-        pass
+    def from_npz(self, filename: str):
+        import numpy as np
+        data: Dict[str, NDArray] = dict(np.load(filename))
+        w = torch.from_numpy(data['w'])
+        self.reset(w)
+        return self
 
     # NOTE: shape of s: [channel, ] or []
     # shape of coef: [..., channel, dof]
     def forward(self, s: Tensor, coef: Tensor):
-        log_coef = coef.abs_().log10_() # [..., channel, dof]
+        log_coef = coef.detach().abs_().log10_() # [..., channel, dof]
         log_coef = log_coef.view(-1, self.n_channels, self.n_dofs) # [N, channel, dof]
         mean_x = self.x.mean()
+
         if s.ndim == 0:
             pred_mean_y = s * (self.x - mean_x) + mean_x # [dof, ]
+            loss = (log_coef - pred_mean_y[None, None, :]).square() # [N, channel, dof]
         elif s.ndim == 1:
             assert s.shape[0] == self.n_channels
-            pred_mean_y = s[:, None] * (self.x - mean_x)[None, :] + mean_x[None, :] # [channel, dof]
+            pred_mean_y = s[:, None] * (self.x - mean_x)[None, :] + mean_x # [channel, dof]
+            loss = (log_coef - pred_mean_y[None, :, :]).square() # [N, channel, dof]
         else:
             raise ValueError(f"Invalid shape of s: {s.shape}")
 
-        loss = (log_coef - pred_mean_y[None, :, :]).square() # [N, channel, dof]
         loss = torch.einsum('nch, h -> nc', loss, self.weight)
         return loss.mean()

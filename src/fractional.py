@@ -400,16 +400,16 @@ class RegressionLoss(Module):
         log_coef = coef.detach().abs_().log10_() # [..., channel, dof]
         log_coef = log_coef.view(-1, self.n_channels, self.n_dofs) # [N, channel, dof]
         mean_x = self.x.mean()
+        mean_y = log_coef.mean(dim=0) # [channel, dof]
 
         if s.ndim == 0:
-            pred_mean_y = s * (self.x - mean_x) + mean_x # [dof, ]
-            loss = (log_coef - pred_mean_y[None, None, :]).square() # [N, channel, dof]
+            pred_mean_y = -s * (self.x - mean_x)[None, :] + mean_y # [channel, dof]
         elif s.ndim == 1:
             assert s.shape[0] == self.n_channels
-            pred_mean_y = s[:, None] * (self.x - mean_x)[None, :] + mean_x # [channel, dof]
-            loss = (log_coef - pred_mean_y[None, :, :]).square() # [N, channel, dof]
+            pred_mean_y = -s[:, None] * (self.x - mean_x)[None, :] + mean_y # [channel, dof]
         else:
             raise ValueError(f"Invalid shape of s: {s.shape}")
 
+        loss = (log_coef - pred_mean_y[None, :, :]).square() # [N, channel, dof]
         loss = torch.einsum('nch, h -> nc', loss, self.weight)
         return loss.mean()

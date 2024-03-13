@@ -1,0 +1,68 @@
+
+data:
+  Half, s0:
+    csv_file: '.\test_partch\plot_data\ln1\run-u100_ln1_multi-tag-s0.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'r'
+
+  Full, s0:
+    csv_file: '.\test_sp_ad\plot_data\ln1\run-u100_ln1_multi-tag-s0.csv'
+    marker: ''
+    linestyle: '--'
+    color: 'r'
+
+  Half, s1:
+    csv_file: '.\test_partch\plot_data\ln1\run-u100_ln1_multi-tag-s1.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'g'
+
+  Full, s1:
+    csv_file: '.\test_sp_ad\plot_data\ln1\run-u100_ln1_multi-tag-s1.csv'
+    marker: ''
+    linestyle: '--'
+    color: 'g'
+
+  Half, s2:
+    csv_file: '.\test_partch\plot_data\ln1\run-u100_ln1_multi-tag-s2.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'b'
+
+  Full, s2:
+    csv_file: '.\test_sp_ad\plot_data\ln1\run-u100_ln1_multi-tag-s2.csv'
+    marker: ''
+    linestyle: '--'
+    color: 'b'
+
+  Half, s3:
+    csv_file: '.\test_partch\plot_data\ln1\run-u100_ln1_multi-tag-s3.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'c'
+
+  Full, s3:
+    csv_file: '.\test_sp_ad\plot_data\ln1\run-u100_ln1_multi-tag-s3.csv'
+    marker: ''
+    linestyle: '--'
+    color: 'c'
+
+smooth: 0.9
+log: False
+
+fig_name: 'loss'
+fig_size: [12, 9]
+title: 'S evolution on 10% low-freq noise'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [-0.1, 0.6]
+ytick_num: 8
+
+index: [0, 49, 99, 149, 199, 249, 299, 349, 399, 449, 499, 549, 599, 649, 699, 749, 799, 849, 899, 949, 999]
+
+show: True
+save: '.\test_partch\figures\s_evo_ln1.png'

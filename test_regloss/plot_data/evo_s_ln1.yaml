@@ -1,0 +1,69 @@
+
+data:
+  s0:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s0.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'red'
+
+  s1:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s1.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'orange'
+
+  s2:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s2.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'y'
+
+  s3:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s3.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'green'
+
+  s4:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s4.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'darkcyan'
+
+  s5:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s5.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'blue'
+
+  s6:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s6.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'purple'
+
+  s7:
+    csv_file: '.\test_regloss\plot_data\ln1\run-u100_ln1_multi-tag-s7.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'black'
+
+
+smooth: 0.9
+log: False
+
+fig_name: 'loss'
+fig_size: [12, 9]
+title: 'S evolution on 10% low-freq noise'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.7]
+ytick_num: 8
+
+index: [0, 1, 2, 3, 4, 5, 7, 10, 15, 21, 31, 44, 62, 88, 125, 177, 250, 354, 500, 707, 999]
+
+show: True
+save: '.\test_regloss\figures\s_evo_ln1.png'

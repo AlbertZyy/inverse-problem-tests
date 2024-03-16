@@ -18,6 +18,12 @@ data:
     linestyle: '-'
     color: 'g'
 
+  Regress:
+    csv_file: '.\test_sp_ad\plot_data\gn001\run-u100_gn001_ad-tag-loss_validate_.csv'
+    marker: 'd'
+    linestyle: '-'
+    color: 'b'
+
 
 smooth: 0.9
 log: False

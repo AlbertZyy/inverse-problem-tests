@@ -1,0 +1,56 @@
+
+data:
+  SNG:
+    csv_file: './test_no_noise/plot_data/run-u100_nn_sng-tag-loss(validate).csv'
+    marker: ''
+    linestyle: '--'
+    color: 'k'
+
+  Single:
+    csv_file: './test_no_noise/plot_data/run-u100_nn_single-tag-loss(validate).csv'
+    marker: 'o'
+    linestyle: '-'
+    color: 'r'
+    markersize: 3
+
+  Multi:
+    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-loss(validate).csv'
+    marker: '^'
+    linestyle: '-'
+    color: 'g'
+    markersize: 3
+
+  Regress:
+    csv_file: './test_no_noise/plot_data/run-u100_nn_ad-tag-loss(validate).csv'
+    marker: 'd'
+    linestyle: '-'
+    color: 'b'
+    markersize: 3
+
+  Stacked:
+    csv_file: './test_no_noise/plot_data/run-u100_nn_sp-tag-loss(validate).csv'
+    marker: 'd'
+    linestyle: '-'
+    color: 'c'
+    markersize: 3
+
+
+smooth: 0.9
+log: False
+
+fig_name: 'loss'
+fig_size: [12, 9]
+title: 'Validation loss (no noise)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.0, 0.1]
+ytick_num: 11
+
+index: 'None'
+slice: [0, 1000, 10]
+
+show: True
+save: './test_no_noise/figures/validation_loss_evo.png'

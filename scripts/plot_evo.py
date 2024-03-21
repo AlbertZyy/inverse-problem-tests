@@ -44,30 +44,37 @@ with open(args.input_file, 'r') as f:
 fig = plt.figure(config['fig_name'], figsize=config['fig_size'])
 axes = fig.subplots(1, 1)
 
+if config.get('index', 'None') != 'None':
+    INDEX = config['index']
+elif config.get('slice', 'None') != 'None':
+    INDEX = slice(*config['slice'])
+else:
+    INDEX = slice(None)
+
 legends = []
 
 for legend, data in config['data'].items():
     legends.append(legend)
-    file_name = data['csv_file']
-    evo_data = np.loadtxt(file_name, delimiter=',', skiprows=1)
+    FILE_NAME = data['csv_file']
+    evo_data = np.loadtxt(FILE_NAME, delimiter=',', skiprows=1)
     step = evo_data[:, 1].astype(np.int_)
     value = evo_data[:, 2]
 
     if config.get('smooth', 0):
         value = exponential_moving_average(value, config['smooth'])
 
-    step = step[config['index']]
-    value = value[config['index']]
-
-    if config.get('log', False):
-        axes.set_yscale('log')
+    step = step[INDEX]
+    value = value[INDEX]
 
     axes.plot(step, value,
               marker=data['marker'],
               color=data['color'],
               linestyle=data['linestyle'],
-              label=legend)
+              label=legend,
+              markersize=data.get('markersize', 12))
 
+if config.get('log', False):
+    axes.set_yscale('log')
 
 axes.legend(legends)
 axes.set_xlabel(config['xlabel'])

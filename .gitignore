@@ -140,6 +140,7 @@ cython_debug/
 # Pytorch
 logs/
 checkpoints/
+ckpts/
 data/
 
 # vscode

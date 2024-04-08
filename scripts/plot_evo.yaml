@@ -7,7 +7,8 @@ data:
     - color: ''
 
 smooth: 0.0
-log: False
+xlog: False
+ylog: False
 
 fig_name: 'loss'
 fig_size: [10, 10]

@@ -56,6 +56,7 @@ legends = []
 for legend, data in config['data'].items():
     legends.append(legend)
     FILE_NAME = data['csv_file']
+    del data['csv_file']
     evo_data = np.loadtxt(FILE_NAME, delimiter=',', skiprows=1)
     step = evo_data[:, 1].astype(np.int_)
     value = evo_data[:, 2]
@@ -66,14 +67,11 @@ for legend, data in config['data'].items():
     step = step[INDEX]
     value = value[INDEX]
 
-    axes.plot(step, value,
-              marker=data['marker'],
-              color=data['color'],
-              linestyle=data['linestyle'],
-              label=legend,
-              markersize=data.get('markersize', 12))
+    axes.plot(step, value, label=legend, **data)
 
-if config.get('log', False):
+if config.get('xlog', False) is True:  # xlog
+    axes.set_xscale('log')
+if config.get('ylog', False) is True:
     axes.set_yscale('log')
 
 axes.legend(legends)

@@ -3,6 +3,7 @@
 求解区域为 [-1, 1], [-1, 1]。
 """
 
+import os
 from typing import Sequence
 from time import time
 import argparse
@@ -36,6 +37,7 @@ with open(args.config, "r") as f:
 
 EXT = config['data']['ext']
 SIGMA = config['data']['sigma']
+NUM_CIR = config['data'].get('num_cir', 3)
 FREQ = config['data']['freq']
 PHR = config['data']['phrase']
 OMEGA_NAME = config['data']['ch_names']
@@ -43,8 +45,11 @@ assert len(OMEGA_NAME) == len(FREQ) * len(PHR)
 DTYPE = config['data']['dtype']
 output_folder = config['output_folder']
 
-if output_folder[-1] != "/":
-    output_folder += "/"
+os.path.join(output_folder, "")
+
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
 
 def main(sigma_iterable: Sequence[int], seed=0, index=0):
     np.random.seed(seed)
@@ -59,9 +64,9 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
 
         while count < 100:
 
-            ctrs = rand(3, 2) * 1.6 - 0.8 # (NCir, GD)
+            ctrs = rand(NUM_CIR, 2) * 1.6 - 0.8 # (NCir, GD)
             b = np.min(0.9-np.abs(ctrs), axis=-1) # (NCir, )
-            rads = rand(3) * (b-0.1) + 0.1 # (NCir, )
+            rads = rand(NUM_CIR) * (b-0.1) + 0.1 # (NCir, )
             ls_fn = lambda p: levelset(p, ctrs, rads)
 
             generator = LaplaceDataGenerator2d.from_cos(
@@ -116,6 +121,7 @@ if __name__ == "__main__":
     print(f"    mesh: {EXT}x{EXT}")
     print(f"    sigma(inclusion): {SIGMA[0]}")
     print(f"    sigma(background): {SIGMA[1]}")
+    print(f"    number of circles: {NUM_CIR}")
     print(f"    freq: {FREQ}")
     print(f"    phrase: {PHR}")
     print(f"    dtype: {DTYPE}")

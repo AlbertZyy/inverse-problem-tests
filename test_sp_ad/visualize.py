@@ -1,6 +1,8 @@
 
+import os
 import sys
-from typing import Callable
+from typing import Callable, Dict, Optional
+from functools import reduce
 
 sys.path.append('./src')
 
@@ -9,68 +11,135 @@ from torch import Tensor
 from torch.nn import MSELoss, Module
 from tqdm import tqdm
 
+from common import loss_fn as cross_entropy
+from fractional import Fractional
 from unet_100 import build_model
-
 from dataset import TPZDataset
 
-tags = ['ln001_sng', 'ln001_single', 'ln001_multi', 'ln001_ad']
-type_s = ['sng', 'single', '', 'ad']
 
+low_pass = Fractional(252, device='cpu')
+low_pass.from_npz(r"./data/laplace_beltrami_63_63.npz")
+low_pass.initialize(s=-0.75)
+low_pass.s.requires_grad_(False)
+
+
+settings = [
+#   ('tag',       'type', 'noise', 'filter', 'ckpts_path')
+    ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_ad',       'ad',     0.0,  None, 'test_no_noise/ckpts'),
+
+    ('gn01_sng',    'sng',    0.01, None, 'test_sp_ad/ckpts'),
+    ('gn01_single', 'single', 0.01, None, 'test_sp_ad/ckpts'),
+    ('gn01_multi',  '',       0.01, None, 'test_sp_ad/ckpts'),
+    ('gn01_ad',     'ad',     0.01, None, 'test_sp_ad/ckpts'),
+
+    ('gn05_sng',    'sng',    0.05, None, 'test_sp_ad/ckpts'),
+    ('gn05_single', 'single', 0.05, None, 'test_sp_ad/ckpts'),
+    ('gn05_multi',  '',       0.05, None, 'test_sp_ad/ckpts'),
+    ('gn05_ad',     'ad',     0.05, None, 'test_sp_ad/ckpts'),
+
+    ('ln01_sng',    'sng',    0.084, low_pass, 'test_sp_ad/ckpts'),
+    ('ln01_single', 'single', 0.084, low_pass, 'test_sp_ad/ckpts'),
+    ('ln01_multi',  '',       0.084, low_pass, 'test_sp_ad/ckpts'),
+    ('ln01_ad',     'ad',     0.084, low_pass, 'test_sp_ad/ckpts'),
+
+    ('ln05_sng',    'sng',    0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('ln05_single', 'single', 0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('ln05_multi',  '',       0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('ln05_ad',     'ad',     0.42, low_pass, 'test_sp_ad/ckpts'),
+]
+
+
+figure_matrix = [3, 7]
+figure_size = (21, 9)
+num_axes = reduce(lambda x, y: x * y, figure_matrix)
 validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200)
 
 NO_EVALUATE = False
-NO_PLOT = True
-save_dir = './test_sp_ad/figures/'
+NO_PLOT = False
+save_dir = 'test_sp_ad/figures/'
+use_noise_filter = True
 
 
-if not NO_EVALUATE:
-    from common import loss_fn as cross_entropy
-    mse = MSELoss()
-
-    def validate(model: Module, loader,
-                loss_fn: Callable[[Tensor, Tensor], Tensor]):
-        model.eval()
-        loss = 0
-        count = 0
-
-        for x, label in tqdm(loader, desc='Validation', unit='batch'):
-            y_pred = model(x)
-            loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
-            count += 1
-
-        return loss / count
+if not NO_PLOT:
+    os.makedirs(save_dir, exist_ok=True)
 
 
-    for tag, type_ in zip(tags, type_s):
-        model, name = build_model('cpu', tag, type_)
-        cross_entropy_loss = validate(model, validation_set.loader(200), cross_entropy)
-        mse_loss = validate(model, validation_set.loader(200), mse)
+mse = MSELoss()
+
+def validate(model: Module,
+             loader,
+             loss_fn: Callable[[Tensor, Tensor], Tensor],
+             noise_coef: float,
+             noise_filter: Optional[Module]=None):
+    model.eval()
+    loss = 0
+    count = 0
+
+    for x, label in tqdm(loader, desc='Validation', unit='batch'):
+        x = x.clone()
+        noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
+        if noise_filter:
+            noise = noise_filter(noise)
+        noise = x[:, :, 0, :] * noise
+        x[:, :, 0, :] += noise
+        y_pred = model(x)
+        loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
+        count += 1
+
+    return loss / count
+
+
+### Validation and Visualization Scripts ###
+
+model_cursor = 0
+
+if not NO_PLOT:
+    from matplotlib.figure import Figure
+    figs: Dict[int, Figure] = {}
+    ID = [62, 92, 12, 22]
+
+for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
+    model, name = build_model('cpu', tag, type_, ckpts_path)
+    model_cursor += 1 # starts from 1
+
+    if not NO_EVALUATE:
+        cross_entropy_loss = validate(model, validation_set.loader(200), cross_entropy, noise_coef, noise_filter)
+        # mse_loss = validate(model, validation_set.loader(200), mse, noise_coef, noise_filter)
         print(f'Validation loss for {name}')
-        print(f'  - cross entropy loss: {cross_entropy_loss}\n  - mse loss: {mse_loss}')
+        print(f'  - cross entropy loss: {cross_entropy_loss}')
+        # print(f"  - mse loss: {mse_loss}")
 
-# if not NO_PLOT:
+    if not NO_PLOT:
+        from matplotlib import pyplot as plt
 
-#     from matplotlib import pyplot as plt
+        # for each sample
+        for i in ID:
+            fig = figs.get(i, None) or plt.figure(f"Data{i}", figsize=figure_size)
+            figs[i] = fig
+            data = validation_set[i][0].clone()
 
-#     ID = [62, 92, 12, 22]
+            noise = torch.randn_like(data[..., 0, :]) * noise_coef
+            if noise_filter:
+                noise = noise_filter(noise)
+            noise = data[..., 0, :] * noise
+            data[..., 0, :] += noise
 
-#     for i in ID:
-#         fig = plt.figure(f"validate - {i}", figsize=(7.5, 7.5))
-#         data, label = validation_set[i]
+            pred = model(data[None, ...])
+            axes = fig.add_subplot(*figure_matrix, model_cursor)
+            axes.imshow(pred.detach().reshape(64, 64))
+            axes.invert_yaxis()
+            axes.set_title(name)
 
-#         for k, (model, name) in enumerate(zip([model_1, model_2, model_3],
-#                                               [name_1, name_2, name_3])):
-#             pred = model(data[None, ...])
-#             axes = fig.add_subplot(2, 2, k+1)
-#             axes.imshow(pred.detach().reshape(64, 64))
-#             axes.invert_yaxis()
-#             axes.set_title(name)
 
-#         axes = fig.add_subplot(2, 2, 4)
-#         axes.imshow(label.to(dtype=torch.float32))
-#         axes.invert_yaxis()
-#         axes.set_title('label')
-#         fig.suptitle(f'validate - {i}')
-#         fig.savefig(f'{save_dir}vis_{i}.png')
-
-#     plt.show()
+if not NO_PLOT:
+    for i in ID:
+        data, label = validation_set[i]
+        axes = figs[i].add_subplot(*figure_matrix, num_axes)
+        axes.imshow(label.to(dtype=torch.float32))
+        axes.invert_yaxis()
+        axes.set_title('label')
+        figs[i].suptitle(f'validate - (cir3)Data{i}')
+        figs[i].savefig(f'{save_dir}vis_cir3_{i}.png')

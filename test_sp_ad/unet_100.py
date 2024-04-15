@@ -1,6 +1,7 @@
 
+import os
 import sys
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import torch
 from torch import Tensor, float32, device
@@ -119,7 +120,7 @@ class RevModel(nn.Module):
     __call__: Callable[[Tensor], Tensor]
 
 
-def build_model(device: device, tag: str, type_: str):
+def build_model(device: device, tag: str, type_: str, ckpts_path: Optional[str]=None):
     EXT = 63
     H = 2./EXT
 
@@ -153,7 +154,9 @@ def build_model(device: device, tag: str, type_: str):
     print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
-        model.load_state_dict(torch.load(f"./test_sp_ad/checkpoints/{FULL_NAME}.pth", map_location=device))
+        ckpts_path = ckpts_path or "./test_sp_ad/ckpts"
+        ckpts_path = os.path.join(ckpts_path, f"{FULL_NAME}.pth")
+        model.load_state_dict(torch.load(ckpts_path, map_location=device))
         print(f"Checkpoint loaded.")
     except FileNotFoundError:
         print(f"No checkpoint found.")

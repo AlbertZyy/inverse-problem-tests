@@ -74,10 +74,12 @@ if config.get('xlog', False) is True:  # xlog
 if config.get('ylog', False) is True:
     axes.set_yscale('log')
 
-axes.legend(legends)
-axes.set_xlabel(config['xlabel'])
-axes.set_ylabel(config['ylabel'])
-axes.set_title(config['title'])
+axes.legend(legends, fontsize=18)
+axes.set_xlabel(config['xlabel'], fontsize=18)
+axes.set_ylabel(config['ylabel'], fontsize=18)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+axes.set_title(config['title'], fontsize=18)
 axes.grid()
 
 lim_args, lim_kwargs = set_lim(config.get('xlim', 'auto'))

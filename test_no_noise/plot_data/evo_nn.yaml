@@ -1,28 +1,28 @@
 
 data:
   SNG:
-    csv_file: '.\test_sp_ad\plot_data\gn01\run-u100_gn01_sng-tag-loss_validate_.csv'
+    csv_file: '.\test_no_noise\plot_data\run-u100_nn_sng-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'k'
 
   Single:
-    csv_file: '.\test_sp_ad\plot_data\gn01\run-u100_gn01_single-tag-loss_validate_.csv'
+    csv_file: '.\test_no_noise\plot_data\run-u100_nn_single-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'r'
 
   Multi:
-    csv_file: '.\test_sp_ad\plot_data\gn01\run-u100_gn01_multi-tag-loss_validate_.csv'
+    csv_file: '.\test_no_noise\plot_data\run-u100_nn_multi-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'g'
 
   Regress:
-    csv_file: '.\test_sp_ad\plot_data\gn01\run-u100_gn01_ad-tag-loss_validate_.csv'
+    csv_file: '.\test_no_noise\plot_data\run-u100_nn_ad-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
@@ -35,7 +35,7 @@ ylog: True
 
 fig_name: 'loss'
 fig_size: [8, 6]
-title: 'Validation loss on 1.0% Gaussian noise'
+title: 'Validation loss (no noise)'
 
 xlabel: 'iteration'
 ylabel: 'loss'
@@ -47,4 +47,4 @@ ytick_num: 8
 slice: [10, 1000, 1]
 
 show: True
-save: '.\test_sp_ad\figures\validation_loss_evo_gn01.png'
+save: '.\test_no_noise\figures\validation_loss_evo_nn.png'

@@ -52,12 +52,12 @@ settings = [
 ]
 
 
-figure_matrix = [3, 7]
-figure_size = (21, 9)
+figure_matrix = [6, 4]
+figure_size = (16, 24)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
 validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200)
 
-NO_EVALUATE = False
+NO_EVALUATE = True
 NO_PLOT = False
 save_dir = 'test_sp_ad/figures/'
 use_noise_filter = True
@@ -103,6 +103,7 @@ if not NO_PLOT:
 
 for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     model, name = build_model('cpu', tag, type_, ckpts_path)
+    model.eval()
     model_cursor += 1 # starts from 1
 
     if not NO_EVALUATE:

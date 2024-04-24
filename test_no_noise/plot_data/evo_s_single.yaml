@@ -1,21 +1,21 @@
 
 data:
-  s0:
+  s:
     csv_file: './test_no_noise/plot_data/run-u100_nn_single-tag-s.csv'
     marker: ''
     linestyle: '-'
-    color: 'red'
+    color: 'blue'
 
 
-smooth: 0.9
-log: False
+smooth: 0.0
+xlog: False
 
-fig_name: 'loss'
+fig_name: 's evo'
 fig_size: [12, 9]
-title: 'S evolution of SINGLE (no noise)'
+title: 'Evolution of scalar s (no noise)'
 
 xlabel: 'iteration'
-ylabel: 'loss'
+ylabel: 'fractional order s'
 
 xlim: 'auto'
 ylim: [0.0, 0.7]

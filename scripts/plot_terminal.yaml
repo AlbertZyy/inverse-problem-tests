@@ -1,0 +1,40 @@
+
+data:
+  legend_name1:
+    csv_files:
+      - ''
+      - ''
+    marker: ''
+    linestyle: '-'
+    linewidth: 1
+    color: 'k'
+
+  legend_name2:
+    csv_file:
+      - ''
+      - ''
+    marker: ''
+    linestyle: '-'
+    linewidth: 1
+    color: 'r'
+
+
+smooth: 0.8
+xlog: True
+ylog: True
+
+fig_name: 'loss'
+fig_size: [8, 6]
+title: 'Validation loss (no noise)'
+
+xlabel: 'iteration'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.03, 0.1]
+ytick_num: 8
+
+slice: [10, 1000, 1]
+
+show: True
+save: ''

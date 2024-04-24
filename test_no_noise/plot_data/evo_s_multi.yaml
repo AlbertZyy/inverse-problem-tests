@@ -49,15 +49,14 @@ data:
     color: 'black'
 
 
-smooth: 0.9
-log: False
+smooth: 0.0
 
-fig_name: 'loss'
+fig_name: 's evo'
 fig_size: [12, 9]
-title: 'S evolution of MULTI (no noise)'
+title: 'Evolution of multi-valued s (no noise)'
 
 xlabel: 'iteration'
-ylabel: 'loss'
+ylabel: 'fractional-order s'
 
 xlim: 'auto'
 ylim: [0.0, 0.7]

@@ -1,10 +1,10 @@
 ### Example config for plot_evo.py
 
 data:
-  - legend_name1:
-    - csv_file: ''
-    - marker: ''
-    - color: ''
+  legend_name1:
+    csv_file: ''
+    marker: ''
+    color: ''
 
 smooth: 0.0
 xlog: False

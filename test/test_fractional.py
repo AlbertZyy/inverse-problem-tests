@@ -37,9 +37,9 @@ gdgn[:, 0, :] += noise
 
 gnvn = df.gd2gn_diff(gdgn[None, ...])
 
-alpha_0 = frac.alpha(gdgn[:, 0, :])
-alpha_1 = frac.alpha(gnvn)[0, ...]
-alpha_2 = frac.alpha(frac(gnvn))[0, ...]
+alpha_0 = frac.decompose(gdgn[:, 0, :])
+alpha_1 = frac.decompose(gnvn)[0, ...]
+alpha_2 = frac.decompose(frac(gnvn))[0, ...]
 
 
 def sum_energy(x: Tensor) -> Tensor:

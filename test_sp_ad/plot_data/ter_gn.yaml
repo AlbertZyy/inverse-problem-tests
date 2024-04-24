@@ -1,0 +1,60 @@
+
+data:
+  no_grad:
+    csv_files:
+      - '.\test_no_noise\plot_data\run-u100_nn_sng-tag-loss(validate).csv'
+      - '.\test_sp_ad\plot_data\gn01\run-u100_gn01_sng-tag-loss_validate_.csv'
+      - '.\test_sp_ad\plot_data\gn05\run-u100_gn05_sng-tag-loss_validate_.csv'
+    marker: 'd'
+    linestyle: '-'
+    linewidth: 1
+    color: 'k'
+
+  single:
+    csv_files:
+      - '.\test_no_noise\plot_data\run-u100_nn_single-tag-loss(validate).csv'
+      - '.\test_sp_ad\plot_data\gn01\run-u100_gn01_single-tag-loss_validate_.csv'
+      - '.\test_sp_ad\plot_data\gn05\run-u100_gn05_single-tag-loss_validate_.csv'
+    marker: 'd'
+    linestyle: '-'
+    linewidth: 1
+    color: 'r'
+
+  multi:
+    csv_files:
+      - '.\test_no_noise\plot_data\run-u100_nn_multi-tag-loss(validate).csv'
+      - '.\test_sp_ad\plot_data\gn01\run-u100_gn01_multi-tag-loss_validate_.csv'
+      - '.\test_sp_ad\plot_data\gn05\run-u100_gn05_multi-tag-loss_validate_.csv'
+    marker: 'd'
+    linestyle: '-'
+    linewidth: 1
+    color: 'g'
+
+  regressive:
+    csv_files:
+      - '.\test_no_noise\plot_data\run-u100_nn_ad-tag-loss(validate).csv'
+      - '.\test_sp_ad\plot_data\gn01\run-u100_gn01_ad-tag-loss_validate_.csv'
+      - '.\test_sp_ad\plot_data\gn05\run-u100_gn05_ad-tag-loss_validate_.csv'
+    marker: 'd'
+    linestyle: '--'
+    linewidth: 1
+    color: 'b'
+
+x: [0.0, 0.01, 0.05]
+smooth: 0.9
+xlog: False
+ylog: True
+
+fig_name: 'loss'
+fig_size: [9, 6]
+title: 'Validation loss (Gaussian noise)'
+
+xlabel: 'noise ratio'
+ylabel: 'loss'
+
+xlim: 'auto'
+ylim: [0.03, 0.07]
+ytick_num: 9
+
+show: True
+save: '.\test_sp_ad\figures\validation_loss_ter_gn.png'

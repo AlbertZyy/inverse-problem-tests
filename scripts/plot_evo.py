@@ -82,6 +82,10 @@ plt.yticks(fontsize=14)
 axes.set_title(config['title'], fontsize=18)
 axes.grid()
 
+### add geometry
+if 'rectangle' in config.keys():
+    axes.add_patch(plt.Rectangle(**config['rectangle']))
+
 lim_args, lim_kwargs = set_lim(config.get('xlim', 'auto'))
 axes.set_xlim(*lim_args, **lim_kwargs)
 lim_args, lim_kwargs = set_lim(config.get('ylim', 'auto'))

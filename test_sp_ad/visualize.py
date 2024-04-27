@@ -25,10 +25,10 @@ low_pass.s.requires_grad_(False)
 
 settings = [
 #   ('tag',       'type', 'noise', 'filter', 'ckpts_path')
-    # ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
-    # ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
-    # ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
-    # ('nn_ad',       'ad',     0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
+    ('nn_ad',       'ad',     0.0,  None, 'test_no_noise/ckpts'),
 
     ('gn01_sng',    'sng',    0.01, None, 'test_sp_ad/ckpts'),
     ('gn01_single', 'single', 0.01, None, 'test_sp_ad/ckpts'),
@@ -58,9 +58,9 @@ figure_size = (16, 24)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
 validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200, device=device)
 
-REPEAT = 1
-NO_EVALUATE = False
-NO_PLOT = True
+REPEAT = 10
+NO_EVALUATE = True
+NO_PLOT = False
 save_dir = 'test_sp_ad/figures/'
 use_noise_filter = True
 
@@ -103,9 +103,10 @@ model_cursor = 0
 if not NO_PLOT:
     from matplotlib.figure import Figure
     figs: Dict[int, Figure] = {}
-    ID = [62, 92, 12, 22]
+    ID = [67, ]
 
 result_string = ""
+result_rounded = ""
 
 for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     model, name = build_model(device, tag, type_, ckpts_path)
@@ -117,7 +118,8 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
         # mse_loss = validate(model, validation_set.loader(200), mse, noise_coef, noise_filter)
         print(f'Validation loss for {name}: {cross_entropy_loss}')
         # print(f"  - mse loss: {mse_loss}")
-        result_string += f"{cross_entropy_loss:.5f}\n"
+        result_string += f"{cross_entropy_loss}\n"
+        result_rounded += f"{round(cross_entropy_loss, 5)}\n"
 
     if not NO_PLOT:
         from matplotlib import pyplot as plt
@@ -143,6 +145,8 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
 if not NO_EVALUATE:
     with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
         f.write(result_string)
+        f.write('\n')
+        f.write(result_rounded)
 
 if not NO_PLOT:
     for i in ID:

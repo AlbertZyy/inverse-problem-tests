@@ -46,21 +46,24 @@ legends = []
 
 for legend, data in config['data'].items():
     legends.append(legend)
-    FILE_NAMES = data.pop('csv_files')
-
     ends = []
+    if 'csv_files' in data:
+        for fname in data.pop('csv_files'):
+            evo_data = np.loadtxt(fname, delimiter=',', skiprows=1)
+            step = evo_data[:, 1].astype(np.int_)
+            value = evo_data[:, 2]
 
-    for fname in FILE_NAMES:
-        evo_data = np.loadtxt(fname, delimiter=',', skiprows=1)
-        step = evo_data[:, 1].astype(np.int_)
-        value = evo_data[:, 2]
+            if config.get('smooth', 0):
+                ending = ema_terminal(value, config['smooth'])
+            else:
+                ending = value[-1]
 
-        if config.get('smooth', 0):
-            ending = ema_terminal(value, config['smooth'])
-        else:
-            ending = value[-1]
-
-        ends.append(ending)
+            ends.append(ending)
+    elif 'values' in data:
+        for v in data.pop('values'):
+            ends.append(v)
+    else:
+        raise ValueError(f"Can not find data for legend {legend}.")
 
     x = config.get('x', None)
     if x is None:  # x is step
@@ -75,19 +78,21 @@ if config.get('ylog', False) is True:
 axes.legend(legends, fontsize=18)
 axes.set_xlabel(config['xlabel'], fontsize=18)
 axes.set_ylabel(config['ylabel'], fontsize=18)
-plt.xticks(fontsize=14)
-plt.yticks(fontsize=14)
 axes.set_title(config['title'], fontsize=18)
 axes.grid()
 
 lim_args, lim_kwargs = set_lim(config.get('xlim', 'auto'))
 axes.set_xlim(*lim_args, **lim_kwargs)
+xticks = config.get('xticks', None)
+plt.xticks(**xticks, fontsize=14) if xticks is not None else plt.xticks(fontsize=14)
+
 lim_args, lim_kwargs = set_lim(config.get('ylim', 'auto'))
 axes.set_ylim(*lim_args, **lim_kwargs)
-
 if lim_args:
     if 'ytick_num' in config.keys():
-        axes.set_yticks(np.linspace(*lim_args, num=config['ytick_num']))
+        tick_data = np.linspace(*lim_args, num=config['ytick_num'])
+        tick_str = [f'{v:.2f}' for v in tick_data]
+        axes.set_yticks(ticks=tick_data, labels=tick_str, fontsize=14)
 
 if config['save']:
     fig.savefig(config['save'])

@@ -25,10 +25,10 @@ low_pass.s.requires_grad_(False)
 
 settings = [
 #   ('tag',       'type', 'noise', 'filter', 'ckpts_path')
-    ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
-    ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
-    ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
-    ('nn_ad',       'ad',     0.0,  None, 'test_no_noise/ckpts'),
+    # ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
+    # ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
+    # ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
+    # ('nn_ad',       'ad',     0.0,  None, 'test_no_noise/ckpts'),
 
     ('gn01_sng',    'sng',    0.01, None, 'test_sp_ad/ckpts'),
     ('gn01_single', 'single', 0.01, None, 'test_sp_ad/ckpts'),
@@ -52,13 +52,15 @@ settings = [
 ]
 
 
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 figure_matrix = [6, 4]
 figure_size = (16, 24)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
-validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200)
+validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200, device=device)
 
-NO_EVALUATE = True
-NO_PLOT = False
+REPEAT = 1
+NO_EVALUATE = False
+NO_PLOT = True
 save_dir = 'test_sp_ad/figures/'
 use_noise_filter = True
 
@@ -73,21 +75,23 @@ def validate(model: Module,
              loader,
              loss_fn: Callable[[Tensor, Tensor], Tensor],
              noise_coef: float,
-             noise_filter: Optional[Module]=None):
+             noise_filter: Optional[Module]=None,
+             repeat: int=1):
     model.eval()
     loss = 0
     count = 0
 
-    for x, label in tqdm(loader, desc='Validation', unit='batch'):
-        x = x.clone()
-        noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
-        if noise_filter:
-            noise = noise_filter(noise)
-        noise = x[:, :, 0, :] * noise
-        x[:, :, 0, :] += noise
-        y_pred = model(x)
-        loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).item()
-        count += 1
+    for _ in range(repeat):
+        for x, label in tqdm(loader, desc='Validation', unit='batch'):
+            x = x.clone()
+            noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
+            if noise_filter:
+                noise = noise_filter(noise)
+            noise = x[:, :, 0, :] * noise
+            x[:, :, 0, :] += noise
+            y_pred = model(x)
+            loss += loss_fn(y_pred, label.flatten().to(dtype=torch.float32)).detach().cpu().item()
+            count += 1
 
     return loss / count
 
@@ -101,17 +105,19 @@ if not NO_PLOT:
     figs: Dict[int, Figure] = {}
     ID = [62, 92, 12, 22]
 
+result_string = ""
+
 for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
-    model, name = build_model('cpu', tag, type_, ckpts_path)
+    model, name = build_model(device, tag, type_, ckpts_path)
     model.eval()
     model_cursor += 1 # starts from 1
 
     if not NO_EVALUATE:
-        cross_entropy_loss = validate(model, validation_set.loader(200), cross_entropy, noise_coef, noise_filter)
+        cross_entropy_loss = validate(model, validation_set.loader(200), cross_entropy, noise_coef, noise_filter, repeat=REPEAT)
         # mse_loss = validate(model, validation_set.loader(200), mse, noise_coef, noise_filter)
-        print(f'Validation loss for {name}')
-        print(f'  - cross entropy loss: {cross_entropy_loss}')
+        print(f'Validation loss for {name}: {cross_entropy_loss}')
         # print(f"  - mse loss: {mse_loss}")
+        result_string += f"{cross_entropy_loss:.5f}\n"
 
     if not NO_PLOT:
         from matplotlib import pyplot as plt
@@ -134,6 +140,9 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
             axes.invert_yaxis()
             axes.set_title(name)
 
+if not NO_EVALUATE:
+    with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
+        f.write(result_string)
 
 if not NO_PLOT:
     for i in ID:

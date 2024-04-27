@@ -2,9 +2,10 @@
 data:
   SNG:
     values:
+      - 0.02243
       - 0.04506
-      - 0.04854
-      - 0.05569
+      - 0.07151
+      - 0.10927
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -12,9 +13,10 @@ data:
 
   Single:
     values:
+      - 0.01889
       - 0.03726
-      - 0.04064
-      - 0.05783
+      - 0.05791
+      - 0.09130
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -22,9 +24,10 @@ data:
 
   Multi:
     values:
+      - 0.01797
       - 0.03502
-      - 0.04348
-      - 0.05617
+      - 0.05677
+      - 0.08803
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -32,29 +35,34 @@ data:
 
   Regress:
     values:
+      - 0.01667
       - 0.03427
-      - 0.04718
-      - 0.06308
+      - 0.05354
+      - 0.08463
     marker: 'd'
-    linestyle: '--'
+    linestyle: '-'
     linewidth: 1
     color: 'b'
 
-x: [0.0, 0.01, 0.05]
+
+x: [0, 1, 2, 3]
 smooth: 0.9
 xlog: False
 ylog: True
 
 fig_name: 'loss'
 fig_size: [9, 6]
-title: 'Validation loss (Gaussian noise)'
+title: 'Validation loss comparison (No Noise)'
 
-xlabel: 'noise ratio'
+xlabel: 'data set'
 ylabel: 'loss'
 
 xlim: 'auto'
-ylim: [0.03, 0.07]
-ytick_num: 9
+xticks:
+  ticks: [0, 1, 2, 3]
+  labels: [CIR2, CIR3, CIR4, CIR5]
+ylim: [0.01, 0.13]
+ytick_num: 7
 
 show: True
-save: '.\test_sp_ad\figures\validation_loss_ter_gn.png'
+save: '.\test_sp_ad\figures\validation_loss_comp_nn.png'

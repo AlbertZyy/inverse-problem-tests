@@ -1,40 +1,40 @@
 
 data:
-  no_grad:
-    csv_files:
-      - '.\test_no_noise\plot_data\run-u100_nn_sng-tag-loss(validate).csv'
-      - '.\test_sp_ad\plot_data\ln01\run-u100_ln01_sng-tag-loss_validate_.csv'
-      - '.\test_sp_ad\plot_data\ln05\run-u100_ln05_sng-tag-loss_validate_.csv'
+  SNG:
+    values:
+      - 0.04506
+      - 0.04349
+      - 0.06077
     marker: 'd'
     linestyle: '-'
     linewidth: 1
     color: 'k'
 
-  single:
-    csv_files:
-      - '.\test_no_noise\plot_data\run-u100_nn_single-tag-loss(validate).csv'
-      - '.\test_sp_ad\plot_data\ln01\run-u100_ln01_single-tag-loss_validate_.csv'
-      - '.\test_sp_ad\plot_data\ln05\run-u100_ln05_single-tag-loss_validate_.csv'
+  Single:
+    values:
+      - 0.03726
+      - 0.0395
+      - 0.05837
     marker: 'd'
     linestyle: '-'
     linewidth: 1
     color: 'r'
 
-  multi:
-    csv_files:
-      - '.\test_no_noise\plot_data\run-u100_nn_multi-tag-loss(validate).csv'
-      - '.\test_sp_ad\plot_data\ln01\run-u100_ln01_multi-tag-loss_validate_.csv'
-      - '.\test_sp_ad\plot_data\ln05\run-u100_ln05_multi-tag-loss_validate_.csv'
+  Multi:
+    values:
+      - 0.03502
+      - 0.0383
+      - 0.05552
     marker: 'd'
     linestyle: '-'
     linewidth: 1
     color: 'g'
 
-  regressive:
-    csv_files:
-      - '.\test_no_noise\plot_data\run-u100_nn_ad-tag-loss(validate).csv'
-      - '.\test_sp_ad\plot_data\ln01\run-u100_ln01_ad-tag-loss_validate_.csv'
-      - '.\test_sp_ad\plot_data\ln05\run-u100_ln05_ad-tag-loss_validate_.csv'
+  Regress:
+    values:
+      - 0.03427
+      - 0.03753
+      - 0.05695
     marker: 'd'
     linestyle: '--'
     linewidth: 1

@@ -3,8 +3,8 @@ data:
   SNG:
     values:
       - 0.04506
-      - 0.04854
-      - 0.05569
+      - 0.04823
+      - 0.05728
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -13,8 +13,8 @@ data:
   Single:
     values:
       - 0.03726
-      - 0.04064
-      - 0.05783
+      - 0.04096
+      - 0.05702
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -23,8 +23,8 @@ data:
   Multi:
     values:
       - 0.03502
-      - 0.04348
-      - 0.05617
+      - 0.04325
+      - 0.05646
     marker: 'd'
     linestyle: '-'
     linewidth: 1
@@ -33,8 +33,8 @@ data:
   Regress:
     values:
       - 0.03427
-      - 0.04718
-      - 0.06308
+      - 0.04675
+      - 0.06177
     marker: 'd'
     linestyle: '--'
     linewidth: 1

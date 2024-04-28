@@ -6,6 +6,7 @@ from functools import reduce
 
 sys.path.append('./src')
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Module
@@ -17,7 +18,8 @@ from unet_100 import build_model
 from dataset import TPZDataset
 
 
-low_pass = Fractional(252, device='cpu')
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+low_pass = Fractional(252, device=device)
 low_pass.from_npz(r"./data/laplace_beltrami_63_63.npz")
 low_pass.initialize(s=-0.75)
 low_pass.s.requires_grad_(False)
@@ -51,16 +53,17 @@ settings = [
     ('ln05_ad',     'ad',     0.42, low_pass, 'test_sp_ad/ckpts'),
 ]
 
-
-device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-figure_matrix = [6, 4]
-figure_size = (16, 24)
+figure_matrix = [5, 4]
+figure_size = (16, 20)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
-validation_set = TPZDataset('./data/gdgn_cir3_e64_64_c8_validate/', 2000, device=device, tqdm=True)
+validation_set = TPZDataset('./data/gdgn_cir3_e64_64_c8_validate/', 200,
+                            channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'],
+                            device=device,
+                            tqdm=True)
 
 REPEAT = 1
-NO_EVALUATE = False
-NO_PLOT = True
+NO_EVALUATE = True
+NO_PLOT = False
 save_dir = 'test_sp_ad/figures/'
 use_noise_filter = True
 
@@ -100,10 +103,13 @@ model_cursor = 0
 if not NO_PLOT:
     from matplotlib.figure import Figure
     figs: Dict[int, Figure] = {}
-    ID = [1647, ]
+    ID = [110, 120, 130, 140]
 
 result_string = ""
 result_rounded = ""
+x = np.linspace(-1, 1, 64)
+y = np.linspace(-1, 1, 64)
+X, Y = np.meshgrid(x, y, indexing='ij')
 
 for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     model, name = build_model(device, tag, type_, ckpts_path)
@@ -120,6 +126,7 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
 
     if not NO_PLOT:
         from matplotlib import pyplot as plt
+        from matplotlib.patches import Circle
 
         # for each sample
         for i in ID:
@@ -134,8 +141,13 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
             data[..., 0, :] += noise
 
             pred = model(data[None, ...])
-            axes = fig.add_subplot(*figure_matrix, model_cursor)
-            axes.imshow(pred.detach().reshape(64, 64))
+            axes = fig.add_subplot(figure_matrix[0], figure_matrix[1], model_cursor)
+            axes.pcolormesh(X, Y, pred.detach().cpu().reshape(64, 64), cmap='rainbow', vmin=0, vmax=1)
+            file_ = np.load(f'data/gdgn_cir3_e64_64_c8_validate/{i}.npz')
+            ctrs, rads = file_['ctrs'], file_['rads']
+            for j in range(ctrs.shape[0]):
+                circle = Circle((ctrs[j, 0], ctrs[j, 1]), rads[j], color='black', fill=False)
+                axes.add_patch(circle)
             axes.invert_yaxis()
             axes.set_title(name)
 
@@ -147,10 +159,5 @@ if not NO_EVALUATE:
 
 if not NO_PLOT:
     for i in ID:
-        data, label = validation_set[i]
-        axes = figs[i].add_subplot(*figure_matrix, num_axes)
-        axes.imshow(label.to(dtype=torch.float32))
-        axes.invert_yaxis()
-        axes.set_title('label')
         figs[i].suptitle(f'validate - (cir3)Data{i}')
         figs[i].savefig(f'{save_dir}vis_cir3_{i}.png')

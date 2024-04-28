@@ -81,10 +81,8 @@ def main(sigma_iterable: Sequence[int], seed=0, index=0):
 
             if generator.is_available():
                 count = 100
-                generator.save(sigma_idx,
-                            output_folder,
-                            OMEGA_NAME,
-                            dtype=np.dtype(DTYPE))
+                generator.save(sigma_idx, output_folder, OMEGA_NAME,
+                               dtype=np.dtype(DTYPE), ctrs=ctrs, rads=rads)
 
 
 def estimate_space_occupied(n_float: int, n_bool: int, n_samples: int, dtype: str):

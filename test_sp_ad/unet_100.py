@@ -114,7 +114,7 @@ class RevModel(nn.Module):
         del coor
         phi = phi.to(self.network_dtype)
         phi = self.unet(phi)
-        phi = torch.sigmoid_(phi.flatten())
+        phi = torch.sigmoid_(phi)
         return phi
 
     __call__: Callable[[Tensor], Tensor]

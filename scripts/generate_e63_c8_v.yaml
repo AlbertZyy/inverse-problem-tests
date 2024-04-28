@@ -1,15 +1,15 @@
 
 head: 0
-tail: 200
+tail: 2000
 
 data:
   sigma: [10., 1.]
   ext: 63
-  num_cir: 5
+  num_cir: 3
   freq: [1, 2, 3, 4, 5, 6, 8, 16]
   phrase: [0., ]
   ch_names: ['1', '2', '3', '4', '5', '6', '8', '16']
   dtype: 'float64'
 
 process_num: 4
-output_folder: './data/gdgn_cir5_e64_64_c8_validate/'
+output_folder: './data/gdgn_cir3_e64_64_c8_validate/'

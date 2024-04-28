@@ -8,7 +8,7 @@ sys.path.append('./src')
 
 import torch
 from torch import Tensor
-from torch.nn import MSELoss, Module
+from torch.nn import Module
 from tqdm import tqdm
 
 from common import loss_fn as cross_entropy
@@ -56,20 +56,17 @@ device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('
 figure_matrix = [6, 4]
 figure_size = (16, 24)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
-validation_set = TPZDataset('./data/gdgn_64_64_validate/', 200, device=device)
+validation_set = TPZDataset('./data/gdgn_cir2_e64_64_c8_validate/', 2000, device=device, tqdm=True)
 
-REPEAT = 10
-NO_EVALUATE = True
-NO_PLOT = False
+REPEAT = 1
+NO_EVALUATE = False
+NO_PLOT = True
 save_dir = 'test_sp_ad/figures/'
 use_noise_filter = True
 
 
 if not NO_PLOT:
     os.makedirs(save_dir, exist_ok=True)
-
-
-mse = MSELoss()
 
 def validate(model: Module,
              loader,
@@ -114,7 +111,7 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     model_cursor += 1 # starts from 1
 
     if not NO_EVALUATE:
-        cross_entropy_loss = validate(model, validation_set.loader(200), cross_entropy, noise_coef, noise_filter, repeat=REPEAT)
+        cross_entropy_loss = validate(model, validation_set.loader(500), cross_entropy, noise_coef, noise_filter, repeat=REPEAT)
         # mse_loss = validate(model, validation_set.loader(200), mse, noise_coef, noise_filter)
         print(f'Validation loss for {name}: {cross_entropy_loss}')
         # print(f"  - mse loss: {mse_loss}")

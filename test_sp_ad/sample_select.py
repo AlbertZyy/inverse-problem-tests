@@ -9,6 +9,7 @@ sys.path.append('./src')
 import torch
 from torch import Tensor
 from torch.nn import Module, BCELoss
+from torchvision.transforms import CenterCrop
 from tqdm import tqdm
 
 from common import loss_fn as cross_entropy
@@ -41,20 +42,23 @@ def validate(model: Module,
              loader,
              loss_fn: Callable[[Tensor, Tensor], Tensor],
              noise_coef: float,
-             noise_filter: Optional[Module]=None) -> Tensor:
+             noise_filter: Optional[Module]=None,
+             transform: Optional[Callable[[Tensor], Tensor]]=None) -> Tensor:
     model.eval()
     loss = []
 
     for x, label in tqdm(loader, desc='Validation', unit='batch'):
         x = x.unsqueeze(0).clone()
         label = label.to(dtype=torch.float32)
+        label = transform(label) if transform else label
         noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
         if noise_filter:
             noise = noise_filter(noise)
         noise = x[:, :, 0, :] * noise
         x[:, :, 0, :] += noise
-        y_pred = model(x)
-        non_reducted = loss_fn(y_pred.squeeze(0, 1), label).detach().cpu().item()
+        y_pred = model(x).squeeze(0, 1)
+        y_pred = transform(y_pred) if transform else y_pred
+        non_reducted = loss_fn(y_pred, label).detach().cpu().item()
         loss.append(non_reducted)
 
     loss_vec = torch.tensor(loss)
@@ -71,7 +75,8 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in (MODEL_A, MODEL_B):
     model, name = build_model(device, tag, type_, ckpts_path)
     model.eval()
 
-    cross_entropy_loss = validate(model, validation_set, cross_entropy, noise_coef, noise_filter)
+    cross_entropy_loss = validate(model, validation_set, cross_entropy, noise_coef, noise_filter,
+                                  transform=CenterCrop(32))
     print(f'Validation loss for {name}: {cross_entropy_loss}')
     result.append(cross_entropy_loss)
 

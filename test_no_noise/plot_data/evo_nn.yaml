@@ -1,6 +1,6 @@
 
 data:
-  SNG:
+  s = 0:
     csv_file: '.\test_no_noise\plot_data\run-u100_nn_sng-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
@@ -21,21 +21,14 @@ data:
     linewidth: 1
     color: 'g'
 
-  Regress:
-    csv_file: '.\test_no_noise\plot_data\run-u100_nn_ad-tag-loss(validate).csv'
-    marker: ''
-    linestyle: '-'
-    linewidth: 1
-    color: 'b'
-
-# rectangle:
-#   xy: [1000, 0.03]
-#   width: 38500
-#   height: 0.07
-#   fill: False
-#   color: 'k'
-#   linestyle: '--'
-#   linewidth: 2
+rectangle:
+  xy: [1000, 0.03]
+  width: 38500
+  height: 0.07
+  fill: False
+  color: 'k'
+  linestyle: '--'
+  linewidth: 2
 
 smooth: 0.8
 xlog: True
@@ -48,11 +41,13 @@ title: 'Validation loss (no noise)'
 xlabel: 'iteration'
 ylabel: 'loss'
 
-xlim: [1000, 35000]
-ylim: [0.03, 0.1]
-ytick_num: 8
+# xlim: [1000, 35000]
+# ylim: [0.03, 0.1]
+# ytick_num: 8
+xlim: 'auto'
+ylim: 'auto'
 
 slice: [1, 1000, 1]
 
 show: True
-save: '.\test_no_noise\figures\validation_loss_evo_nn.png'
+save: '.\test_no_noise\figures\validation_loss_evo_nn_full.png'

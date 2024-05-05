@@ -94,6 +94,8 @@ if lim_args:
         tick_str = [f'{v:.2f}' for v in tick_data]
         axes.set_yticks(ticks=tick_data, labels=tick_str, fontsize=14)
 
+plt.tight_layout()
+
 if config['save']:
     fig.savefig(config['save'])
 

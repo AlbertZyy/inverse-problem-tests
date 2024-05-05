@@ -1,6 +1,6 @@
 
 data:
-  SNG:
+  s = 0:
     values:
       - 0.04506
       - 0.04349
@@ -29,16 +29,6 @@ data:
     linestyle: '-'
     linewidth: 1
     color: 'g'
-
-  Regress:
-    values:
-      - 0.03427
-      - 0.03753
-      - 0.05695
-    marker: 'd'
-    linestyle: '--'
-    linewidth: 1
-    color: 'b'
 
 x: [0.0, 0.01, 0.05]
 smooth: 0.9

@@ -145,7 +145,7 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
             file_ = np.load(f'data/gdgn_cir3_e64_64_c8_validate/{i}.npz')
             ctrs, rads = file_['ctrs'], file_['rads']
             for j in range(ctrs.shape[0]):
-                circle = Circle((ctrs[j, 0], ctrs[j, 1]), rads[j], color='black', fill=False, linewidth=1.5)
+                circle = Circle((ctrs[j, 0], ctrs[j, 1]), rads[j], color='white', fill=False, linewidth=1.5, linestyle='--')
                 axes.add_patch(circle)
             axes.invert_yaxis()
             axes.set_title(name)

@@ -59,8 +59,8 @@ xlabel: 'iteration'
 ylabel: 'fractional-order s'
 
 xlim: 'auto'
-ylim: [0.0, 0.7]
-ytick_num: 8
+ylim: [-0.1, 0.7]
+ytick_num: 9
 
 index: 'None'
 slice: [0, 1000, 1]

@@ -68,7 +68,7 @@ elif CONTEXT == 'numpy':
     mesh_numpy = mesh
 
 
-space = LagrangeFESpace(mesh, p=1)
+space = LagrangeFESpace(mesh, p=3)
 
 tmr.send('mesh_and_space')
 
@@ -80,8 +80,14 @@ lform.add_domain_integrator(ScalarSourceIntegrator(source))
 
 tmr.send('forms')
 
-A = bform.assembly()
-F = lform.assembly()
+torch.cuda.default_stream().synchronize()
+
+
+with torch.cuda.nvtx.range("Assembly A"):
+    A = bform.assembly()
+
+with torch.cuda.nvtx.range("Assembly F"):
+    F = lform.assembly()
 
 if CONTEXT == 'torch':
     F = F.to_dense()
@@ -90,14 +96,15 @@ elif CONTEXT == 'numpy':
     uh = space.function()
 
 tmr.send('assembly')
-
-A, F = DirichletBC(space, solution).apply(A, F, uh)
+with torch.cuda.nvtx.range("Apply dirichlet BC"):
+    A, F = DirichletBC(space, solution).apply(A, F, uh)
 
 tmr.send('dirichlet')
 
 if CONTEXT == 'torch':
     A = A.to_sparse_csr()
-    uh = sparse_cg(A, F, uh, maxiter=5000)
+    with torch.cuda.nvtx.range("Solve CG"):
+        uh = sparse_cg(A, F, uh, maxiter=5000)
     uh = uh.detach().cpu().numpy()
 elif CONTEXT == 'numpy':
     uh, info = cg(A, F, uh)

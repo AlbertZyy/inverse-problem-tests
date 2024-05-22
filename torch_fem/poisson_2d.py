@@ -38,7 +38,7 @@ from fealpy.ml import timer
 from matplotlib import pyplot as plt
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-NX, NY = 128, 128
+NX, NY = 64, 64
 
 def source(points: Tensor):
     x = points[..., 0]
@@ -112,7 +112,7 @@ elif CONTEXT == 'numpy':
 tmr.send('solve(cg)')
 tmr.send('stop')
 
-# fig = plt.figure()
-# axes = fig.add_subplot(111, projection='3d')
-# mesh_numpy.show_function(axes, uh, cmap='jet')
-# plt.show()
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh_numpy.show_function(axes, uh, cmap='jet')
+plt.show()

@@ -30,8 +30,8 @@ torch.random.manual_seed(2024)
 G = torch.randn_like(data[:, 0, :]) * NOISE
 gnoise = data[:, 0, :] * G
 lnoise = data[:, 0, :] * frac(G) * L_FACTOR
-genergy = get_energy(frac.decompose(gnoise)).sqrt_()
-lenergy = get_energy(frac.decompose(lnoise)).sqrt_()
+genergy = get_energy(frac.decompose(gnoise))
+lenergy = get_energy(frac.decompose(lnoise))
 freq = frac.w[::2].sqrt()
 
 fig = plt.figure(figsize=(10, 5))

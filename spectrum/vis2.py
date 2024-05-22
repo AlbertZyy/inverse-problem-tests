@@ -38,9 +38,9 @@ dataset = NPZDataset(r'data\gdgn_cir3_e64_64_c8_validate', names=10,
                      channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'])
 data = dataset[0][0]
 gnvn = df_solver.gd2gn_diff(data[None, ...])[0]
-energy1 = get_energy(frac.decompose(gnvn)).sqrt_()
+energy1 = get_energy(frac.decompose(gnvn))
 gnvn2 = df_solver._frac(gnvn)
-energy2 = get_energy(frac.decompose(gnvn2)).sqrt_()
+energy2 = get_energy(frac.decompose(gnvn2))
 
 fig = plt.figure(figsize=(15, 5))
 fig.tight_layout()

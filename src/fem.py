@@ -26,9 +26,11 @@ class LaplaceFEMSolver():
         self.bsi = ScalarBoundarySourceIntegrator(None, batched=True)
 
         self.bd_dof = self.space.is_boundary_dof()
+        self.bd_cell = mesh.ds.boundary_cell_index()
         self.ips = self.space.interpolation_points()
         bd_face = mesh.ds.boundary_face_index()
         self.bd_face2dof = self.space.face_to_dof()[bd_face, :]
+        self.bd_en = mesh.edge_unit_normal(index=bd_face)
 
     def _init_gd(self):
         A_d = self.dbc.apply_matrix(self._A).to_dense()
@@ -109,5 +111,24 @@ class LaplaceFEMSolver():
             Tensor: A 2-d tensor shaped [number of boundary faces, number of\
                 local quadrature points].
         """
-        bcs, ws, _, fm, index = self.bsi.fetch(self.space)
-        nd = uh[..., self.bd_face2dof]
+        bcs, ws, phi, fm, index = self.bsi.fetch(self.space)
+
+        # extend face bcs to cell bcs
+        bd_face2cell = self.space.mesh.face2cell[index]
+        bd_local_idx = bd_face2cell[index, 2]
+        bd_left_cell = bd_face2cell[index, 0]
+        NVC = self.space.mesh.ds.number_of_vertices_of_cells()
+        result = torch.zeros(ws.shape[0], fm.shape[0], phi.shape[-1]) # (Q, bd_F, I)
+        gphi = self.space.grad_basis(bcs, index=self.bd_cell) # (Q, bd_C, I)
+
+        for i in range(NVC):
+            sub_flag = (bd_local_idx == i) # 局部编号是 i 的边界边
+            sub_lcell = bd_left_cell[sub_flag] # 局部编号是 i 的边界边 的 左边单元
+            ZERO = torch.zeros((bcs.shape[0], 1), dtype=bcs.dtype, device=bcs.device)
+            new_bcs = torch.cat([bcs[:, :i], ZERO, bcs[:, i:]], dim=1)
+            assert new_bcs.shape == (bcs.shape[0], NVC)
+            sub_gphi = gphi[:, sub_lcell, :] # (Q, sub_F, I)
+            nd = torch.einsum('cm, qfim -> qfi', self.bd_en, sub_gphi)
+            result[:, sub_flag, :] = nd
+
+        return result

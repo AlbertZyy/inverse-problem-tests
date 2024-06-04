@@ -46,7 +46,7 @@ class NPZDataset(Dataset):
 
         if isinstance(names, int):
             if names == -1:
-                self.names_seq = [f for f in os.listdir(folder) if f.endswith('.npz')]
+                self.names_seq = [f[:-4] for f in os.listdir(folder) if f.endswith('.npz')]
             else:
                 self.names_seq = range(names)
         else:

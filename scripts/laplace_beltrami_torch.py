@@ -6,17 +6,18 @@ from typing import Tuple
 import argparse
 
 import yaml
+from torch import Tensor
 import numpy as np
 from numpy.typing import NDArray
 from scipy.linalg import eigh
-from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import (
+from fealpy.torch.functionspace import LagrangeFESpace
+from fealpy.torch.fem import (
     BilinearForm,
     ScalarDiffusionIntegrator,
     ScalarMassIntegrator
 )
-from fealpy.mesh import IntervalMesh
-from fealpy.mesh import UniformMesh2d
+from fealpy.torch.mesh import IntervalMesh
+from fealpy.torch.mesh import TriangleMesh
 
 
 parser = argparse.ArgumentParser()
@@ -30,33 +31,37 @@ with open(args.config, "r") as f:
 Q_ = config['fem']['integral']
 assert isinstance(Q_, int)
 assert Q_ >= 1
+P_ = config['fem']['order']
 
-def laplace_eigen_fem(mesh) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+def laplace_eigen_fem(mesh: IntervalMesh, p: int=1) -> Tuple[NDArray, NDArray, NDArray, NDArray]:
+    """_summary_
+
+    Args:
+        mesh (_type_): _description_
+        p (int, optional): _description_. Defaults to 1.
+
+    Returns:
+        Tuple[Tensor, Tensor, Tensor, Tensor]: _description_
     """
-    @brief
-    """
-    space = LagrangeFESpace(mesh, p=3)
+    space = LagrangeFESpace(mesh, p=p)
     bform_0 = BilinearForm(space)
-    bform_0.add_domain_integrator(ScalarDiffusionIntegrator(q=Q_))
-    A = bform_0.assembly().toarray()
+    bform_0.add_integrator(ScalarDiffusionIntegrator(q=Q_))
+    A = bform_0.assembly().to_dense().cpu().numpy()
     bform_1 = BilinearForm(space)
-    bform_1.add_domain_integrator(ScalarMassIntegrator(q=Q_))
-    M = bform_1.assembly().toarray()
-    w, v = eigh(A, M)
+    bform_1.add_integrator(ScalarMassIntegrator(q=Q_))
+    M = bform_1.assembly().to_dense().cpu().numpy()
+    w, v = eigh(A, M) # (gdof,) (gdof, gdof)
+
     return w, v, A, M
 
 EXTx, EXTy = config['mesh']["ext"]
 Lx, Ly = config['mesh']['length']
-Hx = Lx/EXTx
-Hy = Ly/EXTy
 Origin = config['mesh']['origin']
-N_REFINE = config['mesh']['refine']
-
+box = [Origin[0], Origin[0] + Lx, Origin[1], Origin[1] + Ly]
 
 print("Generating Boundary Laplace Beltrami operator...")
 print(f"Config:")
-print(f"  - Domain: [{Origin[0]}, {Origin[0] + Lx}]x[{Origin[1]}, {Origin[1] + Ly}]")
-print(f"  - Mesh: {EXTx}x{EXTy}, refinement: {N_REFINE}")
+print(f"  - Domain: {box[0:2]}x{box[2:4]}")
 print(f"  - Integral points: {Q_}")
 print(f"will be saved to file: {config['file']}", end='\n\n')
 signal_ = input("Continue? (y/n) ")
@@ -64,17 +69,15 @@ signal_ = input("Continue? (y/n) ")
 
 if signal_ in {'y', 'Y'}:
 
-    uniform_mesh = UniformMesh2d([0, EXTx, 0, EXTy], [Hx, Hy], origin=Origin)
-    mesh = IntervalMesh.from_mesh_boundary(uniform_mesh)
-    del uniform_mesh
+    tri_mesh = TriangleMesh.from_box(box, EXTx, EXTy)
+    mesh = IntervalMesh.from_mesh_boundary(tri_mesh)
+    del tri_mesh
 
     NN = mesh.number_of_nodes()
-    mesh.uniform_refine(N_REFINE)
 
-    w, v, _, M = laplace_eigen_fem(mesh)
-
+    w, v, _, M = laplace_eigen_fem(mesh, p=P_)
     w = w[1:NN+1]
-    vinv = (v.T @ M)[1:NN+1, :NN] * 2**N_REFINE
+    vinv = (v.T @ M)[1:NN+1, :NN]
     v = v[:NN, 1:NN+1]
 
     np.savez(config['file'], w=w, v=v, vinv=vinv)
@@ -85,15 +88,11 @@ if signal_ in {'y', 'Y'}:
 
         fig = plt.figure()
 
-        axes = fig.add_subplot(121)
+        axes = fig.add_subplot(111)
         f = np.arange(0, w.shape[0])
         axes.plot(f, np.sqrt(w))
         axes.plot(f, (f+1)/2*np.pi/4)
 
-        axes = fig.add_subplot(122)
-        axes.imshow(M)
-        # mesh.add_plot(axes)
-        # mesh.find_node(axes, index=slice(None, NN), showindex=True)
         plt.show()
 
 else:

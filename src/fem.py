@@ -1,6 +1,9 @@
 
+from typing import Callable, Optional
+
 import torch
 from torch import Tensor, cat
+import torch.nn as nn
 from torch.linalg import lu_factor, lu_solve
 
 from fealpy.torch.mesh import TriangleMesh
@@ -9,28 +12,34 @@ from fealpy.torch.fem import BilinearForm, LinearForm
 from fealpy.torch.fem import (
     ScalarDiffusionIntegrator,
     ScalarBoundarySourceIntegrator,
-    DirichletBC
+    DirichletBC,
 )
+from fealpy.torch.functional import linear_integral
 
 
 class LaplaceFEMSolver():
-    def __init__(self, mesh: TriangleMesh, p: int=1) -> None:
+    def __init__(self, mesh: TriangleMesh, p: int=1, q: Optional[int]=None) -> None:
+        q = q or p + 2
         self.space = LagrangeFESpace(mesh, p=p)
         self.dtype = mesh.ftype
         self.device = mesh.device
 
+        # Generate left-hand-size matrix and define integrators
         bform = BilinearForm(self.space)
-        bform.add_integrator(ScalarDiffusionIntegrator())
+        bform.add_integrator(ScalarDiffusionIntegrator(q=q))
         self._A = bform.assembly()
         self.dbc = DirichletBC(self.space)
-        self.bsi = ScalarBoundarySourceIntegrator(None, zero_integral=True, batched=True)
+        self.bsi = ScalarBoundarySourceIntegrator(None, q=q, zero_integral=True, batched=True)
+
+        # fetch some constants
+        self.NUM_NODES = mesh.number_of_nodes()
+        self.bd_node = mesh.ds.boundary_node_index()
+        self.bd_face = mesh.ds.boundary_face_index()
+        self.bd_face2node = mesh.entity('face', index=self.bd_face)
+        self.bd_en = mesh.edge_unit_normal(index=self.bd_face)
 
         self.bd_dof_flag = self.space.is_boundary_dof()
-        self.bd_cell = mesh.ds.boundary_cell_index()
-        self.ips = self.space.interpolation_points()
-        bd_face = mesh.ds.boundary_face_index()
         self.cell2dof = self.space.cell_to_dof()
-        self.bd_en = mesh.edge_unit_normal(index=bd_face)
 
     def _init_gd(self):
         A_d = self.dbc.apply_matrix(self._A).to_dense()
@@ -84,11 +93,11 @@ class LaplaceFEMSolver():
         if not hasattr(self, 'A_n_LU'):
             self._init_gn()
 
-        self.bsi.f = gn
-        self.bsi.clear(result_only=True)
+        self.bsi.set_source(gn)
         lform = LinearForm(self.space, batch_size=batch_size)
         lform.add_integrator(self.bsi)
         f = lform.assembly()
+        self._latest_gn_f = f
 
         if f.ndim > 1:
             ZERO = torch.zeros((f.shape[0], 1), dtype=self.dtype, device=self.device)
@@ -114,16 +123,15 @@ class LaplaceFEMSolver():
         return uh[..., self.bd_dof_flag]
 
     def normal_derivative(self, uh: Tensor) -> Tensor:
-        """Calculate normal derivatives on boundary face quadrature points.
+        """Calculate normal derivatives on boundary interpolation points.
 
         Args:
             uh (Tensor): Dofs.
 
         Returns:
-            Tensor: A 2-d tensor shaped [number of boundary faces, number of\
-                local quadrature points].
+            Tensor: A 2-d tensor shaped (Batch, bd_F, ldof).
         """
-        bcs, ws, _, fm, index = self.bsi.fetch(self.space)
+        bcs, ws, phi, fm, index = self.bsi.fetch(self.space)
 
         # extend face bcs to cell bcs
         bd_face2cell = self.space.mesh.ds.face2cell[index, :]
@@ -156,6 +164,163 @@ class LaplaceFEMSolver():
             sub_en = self.bd_en[sub_idx]
             nd = torch.einsum('fm, qfim, ...fi -> ...qf', sub_en, sub_gphi, sub_uh) # (B, Q, sub_F)
 
-            result[..., sub_idx] = nd
+            result[..., sub_idx] = nd # (B, Q, bd_F)
 
-        return result
+        return linear_integral(phi, ws, fm, result, batched=True) # (B, bd_F, I2)
+
+    def _init_solve_from_gnf(self):
+        face2dof = self.space.face_to_dof()
+        self.bd_face2dof = face2dof[self.bd_face]
+
+    def solve_from_gnf(self, boundary_local: Optional[Tensor],
+                       boundary_dof: Optional[Tensor],
+                       *, f_only=False) -> Tensor:
+        """Solve Laplace equation with Neumann boundary condition geven
+        the right hand side vector `f`.
+
+        Args:
+            boundary_local (Tensor[B, F_bd, I]): Boundary source integrals in local\
+            format, shaped (B, F_bd, I).
+            boundary_dof (Tensor[B, bddof]): Boundary source integrals in boundary\
+            dof format, shaped (B, bddof).
+
+        Raises:
+            RuntimeError: _description_
+
+        Returns:
+            Tensor: _description_
+        """
+        if not hasattr(self, 'bd_face2dof'):
+            self._init_solve_from_gnf()
+        if not hasattr(self, 'A_n_LU'):
+            self._init_gn()
+
+        gdof = self.bd_dof_flag.shape[0]
+        batch_size = boundary_local.shape[0]
+        f = None
+
+        if boundary_local is not None:
+            vec = torch.sparse_coo_tensor(
+                self.bd_face2dof.reshape(1, -1),
+                boundary_local.permute(1, 2, 0).reshape(-1, batch_size),
+                size=(gdof, batch_size)
+            )
+            f = vec if f is None else f + vec
+        if boundary_dof is not None:
+            vec = torch.sparse_coo_tensor(
+                self.bd_dof_flag.nonzero().T,
+                boundary_dof.permute(1, 0).reshape(-1, batch_size),
+                size=(gdof, batch_size)
+            )
+            f = vec if f is None else f + vec
+        if f is None:
+            raise RuntimeError("boundary_local and boundary_dof cannot be None at the same time.")
+
+        f = f.coalesce().to_dense().transpose_(0, 1)
+
+        if f_only:
+            return f
+
+        if f.ndim > 1:
+            ZERO = torch.zeros((f.shape[0], 1), dtype=self.dtype, device=self.device)
+            f = torch.cat([f, ZERO], dim=-1)
+        elif f.ndim == 1:
+            ZERO = torch.zeros((1, ), dtype=self.dtype, device=self.device)
+            f = torch.cat([f, ZERO], dim=-1)
+        else:
+            raise RuntimeError(f"Invalid f.ndim {f.ndim}.")
+
+        uh = lu_solve(self.A_n_LU, self.pivots_n, f, left=False)
+        return uh[..., :-1]
+
+    def value_on_nodes(self, uh: Tensor) -> Tensor:
+        """Find values on mesh nodes.
+
+        Args:
+            uh (Tensor): Dofs.
+
+        Returns:
+            Tensor: A 1-d tensor sized the number of nodes.
+        """
+        return uh[..., :self.NUM_NODES]
+
+    def boundary_node_to_face(self, value: Tensor) -> Tensor:
+        """Aggregate values on boundary nodes to faces.
+
+        Args:
+            value (Tensor): Value on boundary nodes, shaped [batch_size, boundary nodes,].
+
+        Returns:
+            Tensor: Value on boundary faces, shaped [batch_size, boundary faces,].
+        """
+        NUM_NODES = self.NUM_NODES
+        shape = value.shape[:-1] + (NUM_NODES,)
+        val = torch.zeros(shape, dtype=value.dtype, device=value.device)
+        val[..., self.bd_node] = value
+        return val[..., self.bd_face2node].mean(dim=-1)
+
+
+TensorFunc = Callable[[Tensor], Tensor]
+
+
+class EITDataPreprocessor(nn.Module):
+    """Data Feature Boundary Solver based on FEM."""
+    def __init__(self, solver: LaplaceFEMSolver) -> None:
+        """_summary_
+
+        Args:
+            solver (LaplaceFEMSolver): _description_
+        """
+        super().__init__()
+        self.solver = solver
+
+    __call__: TensorFunc
+
+    def forward(self, input: Tensor) -> Tensor:
+        BATCH, CHANNEL, _, NNBD = input.shape
+        solver = self.solver
+
+        # NOTE: Merge the Batch and Channel axis to vectorize in the FDM solver.
+        input = input.reshape(-1, 2, NNBD) # [B*CH, 2, NN_bd]
+        gd, gn = input[:, 0, :], input[:, 1, :] # [B*CH, NN_bd]
+        vuh = solver.solve_from_gd(gd, BATCH*CHANNEL) # [B*CH, gdof]
+        vn = solver.normal_derivative(vuh) # [B*CH, NF_bd, ldof]
+        gnvn = solver.solve_from_gnf(-vn, gn, f_only=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
+
+        return gnvn.reshape(BATCH, CHANNEL, -1) # [B, CH, bddof]
+
+
+# NOTE: This is the full data feature solver from gd, gn to phi
+class DataFeatureFEMSolver(nn.Module):
+    """Data Feature Solver based on FEM."""
+    def __init__(self, mesh: TriangleMesh, p: int=1,
+                 bc_filter: Optional[TensorFunc]=None) -> None:
+        """_summary_
+
+        Args:
+            mesh (TriangleMesh): _description_
+            p (int, optional): _description_. Defaults to 1.
+            bc_filter (Optional[TensorFunc], optional): _description_. Defaults to None.
+        """
+        super().__init__()
+        self.solver = LaplaceFEMSolver(mesh, p=p)
+        self.bc_filter = bc_filter
+
+    __call__: TensorFunc
+
+    def forward(self, input: Tensor) -> Tensor:
+        BATCH, CHANNEL, NNBD = input.shape
+        solver = self.solver
+
+        if self.bc_filter is not None:
+            gnvn = self.bc_filter(input) # [B, CH, NN_bd]
+        else:
+            gnvn = input
+
+        # NOTE: Merge the Batch and Channel axis again for the FDM solver.
+        gnvn = gnvn.reshape(-1, NNBD) # [B*CH, NN_bd]
+        val = self.solver.solve_from_gnf(None, gnvn) # [B*CH, gdof]
+        img = solver.value_on_nodes(val) # [B*CH, NN]
+
+        # NOTE: Return the result shape
+        return img.reshape(BATCH, CHANNEL, -1) # [B, CH, NN]

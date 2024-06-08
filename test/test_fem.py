@@ -12,8 +12,8 @@ from fem import LaplaceFEMSolver
 BATCH_SIZE = 10
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=64, ny=64, device=device)
-solver = LaplaceFEMSolver(mesh)
+mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=32, ny=32, device=device)
+solver = LaplaceFEMSolver(mesh, p=3)
 
 
 def neumann(p: Tensor):
@@ -25,13 +25,14 @@ def neumann(p: Tensor):
 
 uh = solver.solve_from_gn(neumann, batch_size=BATCH_SIZE)
 
-source_val = solver.bsi._source_val
+# pts = solver.space.interpolation_points()[solver.bd_dof_flag, :]
+original = solver._latest_gn_f[:, solver.bd_dof_flag] # (B, bddof)
 calculated = solver.normal_derivative(uh)
 
-errqf = (calculated - source_val)**2
+err_bddof = solver.solve_from_gnf(calculated, -original, f_only=True)
+err_bddof = err_bddof[:, solver.bd_dof_flag]
+print(err_bddof.pow(2).mean(dim=-1).sqrt().mean(dim=0).item())
 
-from fealpy.torch.functional import integral
-
-bcs, ws, phi, fm, index = solver.bsi.fetch(solver.space)
-errf = integral(errqf, ws, fm, entity_type=True)
-print(errf.sum(1).sqrt())
+uh2 = solver.solve_from_gnf(calculated)
+err = (uh2 - uh).pow(2).mean(dim=-1).sqrt()
+print(err.mean().item())

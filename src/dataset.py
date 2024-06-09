@@ -70,22 +70,23 @@ class NPZDataset(Dataset):
 
     def _read_data(self, fname: Any):
         file_name = os.path.join(self.path, str(fname) + ".npz")
+
         with np.load(file_name) as f:
             datadict = dict(f)
+
         label = datadict[self.label_key]
         del datadict[self.label_key]
-        if len(datadict) == 0:
-            raise ValueError(f"No channel data found in the file '{file_name}'.")
 
-        if len(self.channel_keys) == 0:
-            self.channel_keys.extend(datadict.keys())
-        channels = [datadict[key] for key in self.channel_keys]
-
-        if not self.keep_dim and len(channels) == 1:
-            data = channels[0]
+        if len(self.channel_keys) != 0:
+            channels = [datadict[key] for key in self.channel_keys]
+            if not self.keep_dim and len(channels) == 1:
+                data = channels[0]
+            else:
+                data = np.stack(channels, axis=0)
+            pair = torch.from_numpy(data), torch.from_numpy(label)
         else:
-            data = np.stack(channels, axis=0)
-        pair = torch.from_numpy(data), torch.from_numpy(label)
+            pair = (torch.from_numpy(label), )
+
         return pair
 
     def _read_batch(self, names: Sequence[Any]):
@@ -155,12 +156,12 @@ class TPZDataset(NPZDataset):
         @brief Initialize a dataset from `.npz` files.
 
         @param folder: str. The path to the folder containing `.npz` files.
-        @param names: Collection | int. A collection of file name strings (excluding file extension).
+        @param names: Sequence | int. A Sequence of file name strings (excluding file extension).
                If an positive integer is given, filenames will be strings of integers starting from '0'.
                When -1 is given, take all `.npz` files in the folder.
                Defaults to -1.
         @param channel_keys: Iterable[str], optional. The names of the channel data in each `.npz` file.
-               If None, all channels appearing in the first file are used as the channels of the data set.
+               If None, no channel data will be loaded, and __getitem__ will return a single label.
                Defaults to None.
         @param label_key: str, optional. The name of the label data in a `.npz`.
                Defaults to 'label'.
@@ -174,52 +175,66 @@ class TPZDataset(NPZDataset):
                          label_key=label_key, keep_dim=keep_dim, use_cache=False)
         kwargs = {'device': device, 'pin_memory': pin_memory}
         NUM = len(self.names_seq)
-        if num_workers == 0:
-            worker_batch_size = NUM // 4
-        else:
-            worker_batch_size = NUM // num_workers // 4
-        if worker_batch_size == 0:
-            worker_batch_size = 1
+        # if num_workers == 0:
+        #     worker_batch_size = NUM // 4
+        # else:
+        #     worker_batch_size = NUM // num_workers // 4
+        # if worker_batch_size == 0:
+        #     worker_batch_size = 1
         _preloader = DataLoader(dataset=self.names_seq,
-                                batch_size=worker_batch_size,
+                                batch_size=None,
                                 num_workers=num_workers,
-                                collate_fn=self._read_batch)
+                                collate_fn=self._read_data)
         self._header_data_read = False
 
-        iterator = range(len(_preloader))
+        iterator = _preloader
         if tqdm:
             from tqdm import tqdm as _tqdm
-            iterator = _tqdm(iterator, desc=f"Loading", unit=f'x{worker_batch_size}sample')
+            iterator = _tqdm(iterator, desc=f"Loading", unit=f'sample')
 
-        for batch_idx, pairs in zip(iterator, _preloader):
-            for local_idx, pair in enumerate(pairs):
-                index = batch_idx * worker_batch_size + local_idx
+        # for batch_idx, pairs in zip(iterator, _preloader):
+        for index, pair in enumerate(iterator):
+            # index = batch_idx * worker_batch_size + local_idx
 
-                if not self._header_data_read: # the first data
+            if not self._header_data_read: # the first data
+                if len(pair) == 2:
                     data_shape = pair[0].shape
                     data_dtype = pair[0].dtype
-                    label_shape = pair[1].shape
-                    label_dtype = pair[1].dtype
                     self.data = torch.empty((NUM, *data_shape),
                                             dtype=data_dtype, **kwargs)
-                    self.labels = torch.empty((NUM, *label_shape),
-                                            dtype=label_dtype, **kwargs)
-                    self._header_data_read = True
+                elif len(pair) != 1:
+                    raise ValueError(f"length of samples must be 1 or 2, but got{len(pair)}"
+                                        f"in the {index}th sample.")
+                label_shape = pair[-1].shape
+                label_dtype = pair[-1].dtype
+                self.labels = torch.empty((NUM, *label_shape),
+                                        dtype=label_dtype, **kwargs)
+                self._header_data_read = True
 
+            if len(pair) == 2:
                 self.data[index].copy_(pair[0], non_blocking=True)
-                self.labels[index].copy_(pair[1], non_blocking=True)
+            elif len(pair) != 1:
+                raise ValueError(f"length of samples must be 1 or 2, but got{len(pair)}"
+                                    f"in the {index}th sample.")
+            self.labels[index].copy_(pair[-1], non_blocking=True)
 
     def __getitem__(self, index) -> Tuple[Tensor, Tensor]:
-        return self.data[index].contiguous(), self.labels[index].contiguous()
+        if hasattr(self, 'data'):
+            return self.data[index].contiguous(), self.labels[index].contiguous()
+        else:
+            return self.labels[index].contiguous()
 
     def __getitems__(self, indices) -> Tuple[Tensor, Tensor]:
-        return self.data[indices].contiguous(), self.labels[indices].contiguous()
+        if hasattr(self, 'data'):
+            return self.data[indices].contiguous(), self.labels[indices].contiguous()
+        else:
+            return self.labels[indices].contiguous()
 
     def loader(self, batch_size: int, drop_last=False):
-        return _TPZLoader(dataset=self, batch_size=batch_size, drop_last=drop_last)
+        return _Loader(dataset=self, batch_size=batch_size, drop_last=drop_last)
 
 
-class _TPZLoader():
+class _Loader():
     dataset: TPZDataset
     batch_size: int
     sampler: RandomSampler
@@ -244,7 +259,10 @@ class _TPZLoader():
 
     def __next__(self):
         indices = next(self._iterator)
-        return self.dataset.__getitems__(indices)
+        if hasattr(self.dataset, '__getitems__'):
+            return self.dataset.__getitems__(indices)
+        else:
+            raise NotImplementedError
 
     def __iter__(self):
         self.reset_iterator()
@@ -257,6 +275,69 @@ class _TPZLoader():
             raise RuntimeError(f"Cannot set attribute {attr} after {self.__class__.__name__} is initialized.")
 
         super().__setattr__(attr, val)
+
+
+class NPYDataset(Dataset):
+    def __init__(self, folder: str, names: Sequence[str]) -> None:
+        super().__init__()
+        self.folder = folder
+        self.names = names
+
+    def __len__(self) -> int:
+        return len(self.names)
+
+    def read_data(self, file_name: str):
+        data = np.load(os.path.join(self.folder, file_name + ".npy"))
+        return torch.from_numpy(data)
+
+    def __getitem__(self, index: int):
+        return self.read_data(self.names[index])
+
+    def read_batch(self, names: Sequence[str]):
+        return [self.read_data(name) for name in names]
+
+
+class TPYDataset(NPYDataset):
+    data: Tensor
+    def __init__(self, folder: str, names: Sequence[str], *,
+                 device: Union[str, _device, None]=None,
+                 num_workers: int=0, tqdm=False) -> None:
+        """Build a tensor dataset in memory from a folder of .npy files.
+
+        Args:
+            folder (str): Path to the folder.
+            names (Sequence[str]): Names of .npy files.
+            device (Union[str, _device, None], optional): _description_. Defaults to None.
+            num_worker (int, optional): _description_. Defaults to 0.
+            tqdm (bool, optional): _description_. Defaults to False.
+        """
+        super().__init__(folder, names)
+        NUM = len(names)
+        _preloader = DataLoader(dataset=self.names,
+                                batch_size=None,
+                                shuffle=False,
+                                num_workers=num_workers,
+                                collate_fn=self.read_data)
+        self._header_data_read = False
+        iterator = range(len(_preloader))
+
+        if tqdm:
+            from tqdm import tqdm as _tqdm
+            iterator = _tqdm(iterator, desc=f"Loading", unit='sample')
+
+        for index, data in zip(iterator, _preloader):
+            if not self._header_data_read:
+                shape = (NUM, ) + data.shape
+                self.data = torch.zeros(shape, dtype=data.dtype, device=device)
+                self._header_data_read = True
+
+            self.data[index, ...] = data
+
+    def __getitem__(self, index: int):
+        return self.data[index, ...]
+
+    def __getitems__(self, indices: Sequence[int]):
+        return self.data[indices, ...]
 
 
 if __name__ == '__main__':

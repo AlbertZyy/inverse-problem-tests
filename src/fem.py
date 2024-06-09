@@ -190,33 +190,32 @@ class LaplaceFEMSolver():
         Returns:
             Tensor: _description_
         """
-        if not hasattr(self, 'bd_face2dof'):
-            self._init_solve_from_gnf()
         if not hasattr(self, 'A_n_LU'):
             self._init_gn()
 
         gdof = self.bd_dof_flag.shape[0]
-        batch_size = boundary_local.shape[0]
-        f = None
 
         if boundary_local is not None:
+            if not hasattr(self, 'bd_face2dof'):
+                self._init_solve_from_gnf()
+
+            batch_size = boundary_local.shape[0]
             vec = torch.sparse_coo_tensor(
                 self.bd_face2dof.reshape(1, -1),
                 boundary_local.permute(1, 2, 0).reshape(-1, batch_size),
                 size=(gdof, batch_size)
             )
-            f = vec if f is None else f + vec
-        if boundary_dof is not None:
-            vec = torch.sparse_coo_tensor(
-                self.bd_dof_flag.nonzero().T,
-                boundary_dof.permute(1, 0).reshape(-1, batch_size),
-                size=(gdof, batch_size)
-            )
-            f = vec if f is None else f + vec
-        if f is None:
-            raise RuntimeError("boundary_local and boundary_dof cannot be None at the same time.")
+            f = vec.coalesce().to_dense()
 
-        f = f.coalesce().to_dense().transpose_(0, 1)
+            if boundary_dof is not None:
+                f[self.bd_dof_flag] = boundary_dof
+        else:
+            if boundary_dof is None:
+                raise RuntimeError("boundary_local and boundary_dof cannot be None at the same time.")
+
+            batch_size = boundary_dof.shape[0]
+            f = torch.zeros((batch_size, gdof), dtype=self.dtype, device=self.device)
+            f[:, self.bd_dof_flag] = boundary_dof
 
         if f_only:
             return f

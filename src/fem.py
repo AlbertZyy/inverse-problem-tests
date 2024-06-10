@@ -15,6 +15,9 @@ from fealpy.torch.fem import (
     DirichletBC,
 )
 from fealpy.torch.functional import linear_integral
+from fealpy.torch import logger
+
+logger.setLevel('WARNING')
 
 
 class LaplaceFEMSolver():
@@ -122,30 +125,17 @@ class LaplaceFEMSolver():
         """
         return uh[..., self.bd_dof_flag]
 
-    def normal_derivative(self, uh: Tensor) -> Tensor:
-        """Calculate normal derivatives on boundary interpolation points.
+    def _init_normal(self):
+        ldof = self.space.number_of_local_dofs()
+        GD = self.space.mesh.geo_dimension()
 
-        Args:
-            uh (Tensor): Dofs.
-
-        Returns:
-            Tensor: A 2-d tensor shaped (Batch, bd_F, ldof).
-        """
-        bcs, ws, phi, fm, index = self.bsi.fetch(self.space)
-
-        # extend face bcs to cell bcs
+        bcs, ws, _, fm, index = self.bsi.fetch(self.space)
         bd_face2cell = self.space.mesh.ds.face2cell[index, :]
         bd_local_idx = bd_face2cell[:, 2]
         bd_left_cell = bd_face2cell[:, 0]
-        bd_left_cell_dof = self.cell2dof[bd_left_cell]
-
-        if uh.ndim > 1:
-            result_shape = (uh.shape[0], ws.shape[0], fm.shape[0]) # (B, Q, bd_F)
-        else:
-            result_shape = (ws.shape[0], fm.shape[0]) # (Q, bd_F)
-
-        result = torch.zeros(result_shape, dtype=self.dtype, device=self.device)
-        bd_uh = uh[..., bd_left_cell_dof] # (B, bd_F, I3)
+        self.bd_left_cell_dof = self.cell2dof[bd_left_cell]
+        gphi_shape = (ws.shape[0], fm.shape[0], ldof, GD)
+        gphi = torch.zeros(gphi_shape, dtype=self.dtype, device=self.device)
 
         for i in range(3):
             sub_idx = (bd_local_idx == i).nonzero(as_tuple=True)[0] # 边界边中局部编号是 i 的边
@@ -158,13 +148,29 @@ class LaplaceFEMSolver():
                 new_bcs = new_bcs.flip(dims=(1,))
             assert new_bcs.shape == (bcs.shape[0], 3)
 
-            sub_uh = bd_uh[..., sub_idx, :] # (B, sub_F, I3)
             sub_lcell = bd_left_cell[sub_idx] # 边界边中局部编号是 i 的边 的 左边单元全局编号
             sub_gphi = self.space.grad_basis(new_bcs, index=sub_lcell, variable='x') # (Q, sub_F, I3, GD)
-            sub_en = self.bd_en[sub_idx]
-            nd = torch.einsum('fm, qfim, ...fi -> ...qf', sub_en, sub_gphi, sub_uh) # (B, Q, sub_F)
+            gphi[:, sub_idx, :, :] = sub_gphi
 
-            result[..., sub_idx] = nd # (B, Q, bd_F)
+        self.bd_cell_gphi_on_bd_face = gphi # (Q, bd_F, I3, GD)
+
+    def normal_derivative(self, uh: Tensor) -> Tensor:
+        """Calculate normal derivatives on boundary interpolation points.
+
+        Args:
+            uh (Tensor): Dofs.
+
+        Returns:
+            Tensor: A 2-d tensor shaped (Batch, bd_F, ldof).
+        """
+        if not hasattr(self, 'bd_cell_gphi_on_bd_face'):
+            self._init_normal()
+
+        gphi = self.bd_cell_gphi_on_bd_face
+        _, ws, phi, fm, _ = self.bsi.fetch(self.space)
+        bd_left_cell_dof = self.bd_left_cell_dof
+        bd_uh = uh[..., bd_left_cell_dof] # (B, bd_F, I3)
+        result = torch.einsum('fm, qfim, ...fi -> ...qf', self.bd_en, gphi, bd_uh) # (B, Q, bd_F)
 
         return linear_integral(phi, ws, fm, result, batched=True) # (B, bd_F, I2)
 
@@ -205,10 +211,10 @@ class LaplaceFEMSolver():
                 boundary_local.permute(1, 2, 0).reshape(-1, batch_size),
                 size=(gdof, batch_size)
             )
-            f = vec.coalesce().to_dense()
+            f = vec.coalesce().to_dense().transpose_(0, 1)
 
             if boundary_dof is not None:
-                f[self.bd_dof_flag] = boundary_dof
+                f[:, self.bd_dof_flag] = boundary_dof
         else:
             if boundary_dof is None:
                 raise RuntimeError("boundary_local and boundary_dof cannot be None at the same time.")
@@ -292,17 +298,16 @@ class EITDataPreprocessor(nn.Module):
 # NOTE: This is the full data feature solver from gd, gn to phi
 class DataFeatureFEMSolver(nn.Module):
     """Data Feature Solver based on FEM."""
-    def __init__(self, mesh: TriangleMesh, p: int=1,
+    def __init__(self, solver: LaplaceFEMSolver,
                  bc_filter: Optional[TensorFunc]=None) -> None:
         """_summary_
 
         Args:
-            mesh (TriangleMesh): _description_
-            p (int, optional): _description_. Defaults to 1.
+            solver (LaplaceFEMSolver): _description_
             bc_filter (Optional[TensorFunc], optional): _description_. Defaults to None.
         """
         super().__init__()
-        self.solver = LaplaceFEMSolver(mesh, p=p)
+        self.solver = solver
         self.bc_filter = bc_filter
 
     __call__: TensorFunc

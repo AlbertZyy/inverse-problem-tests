@@ -11,7 +11,7 @@ from fealpy.torch.mesh import TriangleMesh
 sys.path.append("./src")
 
 from fractional import StackedFractional, RegressiveFractional, Fractional, MultiChannelFractional
-from fem import DataFeatureFEMSolver
+from fem import LaplaceFEMSolver, EITDataPreprocessor, DataFeatureFEMSolver
 
 
 class ConvBlock(nn.Module):
@@ -97,7 +97,9 @@ class RevModel(nn.Module):
     def __init__(self, n_channel: int, mesh: TriangleMesh, frac: nn.Module,
                  *, network_dtype=float32) -> None:
         super().__init__()
-        self.df_solver = DataFeatureFEMSolver(mesh, p=1, bc_filter=frac) # [N, 16, 64, 64]
+        solver = LaplaceFEMSolver(mesh, p=1)
+        self.df_prepor = EITDataPreprocessor(solver)
+        self.df_solver = DataFeatureFEMSolver(solver, bc_filter=frac) # [N, 16, 64, 64]
         self.bn = nn.BatchNorm2d(n_channel, momentum=0.01, dtype=mesh.ftype)
         self.coordinate = mesh.entity('node').reshape(64, 64, 2).permute(2, 0, 1) # [2, 64, 64]
         self.unet = Unet(n_channel+2, dtype=network_dtype)
@@ -106,6 +108,7 @@ class RevModel(nn.Module):
     def forward(self, input: Tensor):
         N = input.shape[0]
         coor = self.coordinate[None, ...].repeat(N, 1, 1, 1)
+        input = self.df_prepor(input)
         phi = self.df_solver(input).reshape(N, 8, 64, 64)
         del input
         phi = self.bn(phi)

@@ -12,8 +12,8 @@ from fem import LaplaceFEMSolver
 BATCH_SIZE = 10
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=32, ny=32, device=device)
-solver = LaplaceFEMSolver(mesh, p=3)
+mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=64, ny=64, device=device)
+solver = LaplaceFEMSolver(mesh, p=1)
 
 
 def neumann(p: Tensor):
@@ -33,6 +33,6 @@ err_bddof = solver.solve_from_gnf(calculated, -original, f_only=True)
 err_bddof = err_bddof[:, solver.bd_dof_flag]
 print(err_bddof.pow(2).mean(dim=-1).sqrt().mean(dim=0).item())
 
-uh2 = solver.solve_from_gnf(calculated)
+uh2 = solver.solve_from_gnf(calculated, None)
 err = (uh2 - uh).pow(2).mean(dim=-1).sqrt()
 print(err.mean().item())

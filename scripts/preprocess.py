@@ -13,19 +13,32 @@ from fealpy.torch import logger
 from tqdm import tqdm
 
 from fem import EITDataPreprocessor, LaplaceFEMSolver
-from dataset import NPZDataset, DataLoader
+from fractional import Fractional
+from dataset import NPYDataset, DataLoader
 
 
 logger.setLevel('WARNING')
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-INPUT_FOLDER = 'data/cir3_e64_64_c8_validate'
-OUTPUT_FOLDER = 'data/cir3_e64_64_c8_validate_processed'
+INPUT_FOLDER = 'data/cir3_e64_64_c8'
+START = 0
+END = 12000
+OUTPUT_FOLDER = 'data/cir3_e64_64_c8/gnvn_g1'
+NOISE = 0.01
+use_noise_filter = False
+
+
+if use_noise_filter:
+    noise_filter = Fractional(252, device=DEVICE)
+    noise_filter.from_npz(r"./data/laplace_beltrami_torch_63_63.npz")
+    noise_filter.initialize(s=-0.75)
+    noise_filter.s.requires_grad_(False)
+else:
+    noise_filter = None
 
 
 def process_data(queue):
-    dataset = NPZDataset(INPUT_FOLDER,
-                        names=[f"gd_{i}" for i in range(2000)],
-                        channel_keys=['gd', ])
+    dataset = NPYDataset(os.path.join(INPUT_FOLDER, 'gd'),
+                         names=[f"{i}" for i in range(START, END)])
     loader = DataLoader(dataset, batch_size=100, drop_last=False)
     gn = torch.from_numpy(
         np.load(os.path.join(INPUT_FOLDER, 'gn.npy'))
@@ -36,8 +49,12 @@ def process_data(queue):
     solver = LaplaceFEMSolver(mesh, p=1)
     processor = EITDataPreprocessor(solver)
 
-    for gd, _ in tqdm(loader):
+    for gd in tqdm(loader):
         gd = gd.to(DEVICE)
+        noise = torch.randn_like(gd) * NOISE
+        if noise_filter:
+            noise = noise_filter(noise)
+        gd += gd * noise
         gn_ = gn.broadcast_to(gd.shape)
         data = torch.stack([gd, gn_], dim=-2) # [B, CH, 2, bddof]
         gnvn = processor(data).cpu().numpy()
@@ -59,7 +76,7 @@ def main():
             break
 
         for i in range(item.shape[0]):
-            np.save(os.path.join(OUTPUT_FOLDER, f'gnvn_{index}.npy'), item[i, ...])
+            np.save(os.path.join(OUTPUT_FOLDER, f'{index}.npy'), item[i, ...])
             index += 1
 
 

@@ -1,10 +1,12 @@
 
+import os
 import sys
 import argparse
 
 sys.path.append('./src')
 
 import yaml
+import numpy as np
 import torch
 from torch.optim import SGD
 # from torch.utils.tensorboard import SummaryWriter
@@ -54,29 +56,41 @@ data_conf = config['data']
 # loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=1, pin_memory=True)
 
 train_data_dataset = TPYDataset(
-    data_conf['train_set_location']['data'],
-    names=[f"gnvn_{i}" for i in range(data_conf['train_set_volume'])],
+    os.path.join(data_conf['train_set_location'], 'gd'),
+    names=[str(i) for i in range(data_conf['train_set_start'], data_conf['train_set_end'])],
     num_workers=0,
     device=device,
     tqdm=True
 )
 
 train_label_dataset = TPZDataset(
-    data_conf['train_set_location']['label'],
-    names=[f"gd_{i}" for i in range(data_conf['train_set_volume'])],
+    os.path.join(data_conf['train_set_location'], 'inclusion'),
+    names=[str(i) for i in range(data_conf['train_set_start'], data_conf['train_set_end'])],
     num_workers=0,
     device=device,
     tqdm=True
 )
 
-# validate_dataset = TPZDataset(
-#     data_conf['validate_set_location'],
-#     names=data_conf['validate_set_volume'],
-#     channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'],
-#     num_workers=4,
-#     device=device,
-#     tqdm=True
-# )
+validate_data_dataset = TPYDataset(
+    os.path.join(data_conf['validate_set_location'], 'gd'),
+    names=[str(i) for i in range(data_conf['validate_set_start'], data_conf['validate_set_end'])],
+    num_workers=0,
+    device=device,
+    tqdm=True
+)
+
+validate_label_dataset = TPZDataset(
+    os.path.join(data_conf['validate_set_location'], 'inclusion'),
+    names=[str(i) for i in range(data_conf['validate_set_start'], data_conf['validate_set_end'])],
+    num_workers=0,
+    device=device,
+    tqdm=True
+)
+
+gn_origin = torch.from_numpy(
+    np.load(os.path.join(data_conf['train_set_location'], 'gn.npy'))
+).to(device)
+
 
 iter_per_epoch, remander = divmod(len(train_data_dataset), data_conf['train_batch_size'])
 assert remander == 0
@@ -148,16 +162,18 @@ def train(epoch: int):
 
     for indices in tqdm(batch_sampler,
                         desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
-        gnvn = train_data_dataset[indices]
+        gd = train_data_dataset[indices]
+        gn = gn_origin[None, ...].broadcast_to(gd.shape)
+        gdgn = torch.stack([gd, gn], dim=-2) # (N, CH, 2, bddof)
         optim.zero_grad()
 
-        # noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
-        # if noise_filter:
-        #     noise = noise_filter(noise)
-        # noise = gdgn[:, :, 0, :] * noise
-        # gdgn[:, :, 0, :] += noise
+        noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
+        if noise_filter:
+            noise = noise_filter(noise)
+        noise = gdgn[:, :, 0, :] * noise
+        gdgn[:, :, 0, :] += noise
 
-        y_out = model(gnvn).squeeze(1) # (N, 1, Nx, Ny)
+        y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
         label = train_label_dataset[indices].reshape(y_out.shape)
         loss = loss_fn(y_out, label.to(dtype=torch.float32))
         loss.backward()
@@ -180,25 +196,36 @@ def train(epoch: int):
         torch.save(model.state_dict(), checkpoint_path)
 
 
-# def validate(epoch):
-#     gdgn, label = next(validate_dataset.loader(data_conf['validate_batch_size']))
-#     with torch.no_grad():
+def validate(epoch):
+    sampler = RandomSampler(validate_data_dataset)
+    batch_sampler = BatchSampler(sampler, batch_size=data_conf['validate_batch_size'], drop_last=False)
+    losses = []
 
-#         noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
-#         if noise_filter:
-#             noise = noise_filter(noise)
-#         noise = gdgn[:, :, 0, :] * noise
-#         gdgn[:, :, 0, :] += noise
+    with torch.no_grad():
+        for indices in tqdm(batch_sampler,
+                        desc=f'Epoch {epoch + 1}/{n_epoch}', unit='batch', leave=False):
+            gd = validate_data_dataset[indices]
+            gn = gn_origin[None, ...].broadcast_to(gd.shape)
+            gdgn = torch.stack([gd, gn], dim=-2) # (N, CH, 2, bddof)
+            noise = torch.randn_like(gdgn[:, :, 0, :]) * NOISE
+            if noise_filter:
+                noise = noise_filter(noise)
+            noise = gdgn[:, :, 0, :] * noise
+            gdgn[:, :, 0, :] += noise
 
-#         y_out = model(gdgn.to(device=device))
-#         loss = loss_fn(y_out, label.flatten().to(dtype=torch.float32, device=device))
+            y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
+            label = validate_label_dataset[indices].reshape(y_out.shape)
+            loss = loss_fn(y_out, label.to(dtype=torch.float32))
+            losses.append(loss.item())
 
-#     writer_1.add_scalar('loss(validate)', loss.item(), iter_head + (epoch + 1)*iter_per_epoch)
+        loss_mean = sum(losses) / len(losses)
+
+    # writer_1.add_scalar('loss(validate)', loss_mean, iter_head + (epoch + 1)*iter_per_epoch)
 
 
 for epoch in trange(0, n_epoch, desc='Training', unit='epoch'):
     train(epoch)
-    # validate(epoch)
+    validate(epoch)
 
 # writer_1.close()
 print("Done.")

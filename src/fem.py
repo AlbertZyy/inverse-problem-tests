@@ -214,7 +214,7 @@ class LaplaceFEMSolver():
             f = vec.coalesce().to_dense().transpose_(0, 1)
 
             if boundary_dof is not None:
-                f[:, self.bd_dof_flag] = boundary_dof
+                f[:, self.bd_dof_flag] += boundary_dof
         else:
             if boundary_dof is None:
                 raise RuntimeError("boundary_local and boundary_dof cannot be None at the same time.")

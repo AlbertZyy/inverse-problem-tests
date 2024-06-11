@@ -9,7 +9,7 @@ import yaml
 import numpy as np
 import torch
 from torch.optim import SGD
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import RandomSampler, BatchSampler
 from tqdm import tqdm, trange
 
@@ -48,17 +48,12 @@ device = torch.device(f'cuda:{GPU_ID}' if torch.cuda.is_available() else 'cpu')
 ### build model & data set
 
 model, MODEL_NAME = build_model(device, tag=config['tag'], type_=type_)
-
 data_conf = config['data']
-# train_dataset = NPZDataset(data_conf['train_set_location'], data_conf['train_set_volume'], use_cache=True)
-# validate_dataset = NPZDataset(data_conf['validate_set_location'], data_conf['validate_set_volume'], use_cache=True)
-# loader = DataLoader(train_dataset, batch_size=data_conf['train_batch_size'], shuffle=True, num_workers=4, pin_memory=True)
-# loader_2 = DataLoader(validate_dataset, batch_size=data_conf['validate_batch_size'], shuffle=True, num_workers=1, pin_memory=True)
 
 train_data_dataset = TPYDataset(
     os.path.join(data_conf['train_set_location'], 'gd'),
     names=[str(i) for i in range(data_conf['train_set_start'], data_conf['train_set_end'])],
-    num_workers=0,
+    num_workers=4,
     device=device,
     tqdm=True
 )
@@ -66,7 +61,7 @@ train_data_dataset = TPYDataset(
 train_label_dataset = TPZDataset(
     os.path.join(data_conf['train_set_location'], 'inclusion'),
     names=[str(i) for i in range(data_conf['train_set_start'], data_conf['train_set_end'])],
-    num_workers=0,
+    num_workers=4,
     device=device,
     tqdm=True
 )
@@ -74,7 +69,7 @@ train_label_dataset = TPZDataset(
 validate_data_dataset = TPYDataset(
     os.path.join(data_conf['validate_set_location'], 'gd'),
     names=[str(i) for i in range(data_conf['validate_set_start'], data_conf['validate_set_end'])],
-    num_workers=0,
+    num_workers=4,
     device=device,
     tqdm=True
 )
@@ -82,7 +77,7 @@ validate_data_dataset = TPYDataset(
 validate_label_dataset = TPZDataset(
     os.path.join(data_conf['validate_set_location'], 'inclusion'),
     names=[str(i) for i in range(data_conf['validate_set_start'], data_conf['validate_set_end'])],
-    num_workers=0,
+    num_workers=4,
     device=device,
     tqdm=True
 )
@@ -118,28 +113,18 @@ print(f"  - momentum: {momentum}")
 print(f"  - weight decay: {weight_decay}", end='\n\n')
 
 log_dir = config['log_dir']
-if log_dir[-1] != '/':
-    log_dir += '/'
 
 print(f"Logs will be saved in {log_dir}")
 
-checkpoint_path = ''
-
 if SAVE:
     checkpoint_dir = config['checkpoint_dir']
-
-    if checkpoint_dir[-1] != '/':
-        checkpoint_dir += '/'
-
-    checkpoint_path = checkpoint_dir + MODEL_NAME + '.pth'
+    checkpoint_path = os.path.join(checkpoint_dir, MODEL_NAME + '.pth')
     print(f"Checkpoints will be saved as {checkpoint_path}", end='\n\n')
-
 else:
+    checkpoint_path = ''
     print("Checkpoints saving disabled.", end='\n\n')
 
-signal_ = input("Continue? (y/n)")
-
-if signal_ not in {'y', 'Y'}:
+if input("Continue? (y/n)") not in {'y', 'Y'}:
     print("Aborted.")
     exit(0)
 
@@ -147,8 +132,7 @@ if signal_ not in {'y', 'Y'}:
 
 optim = SGD(model.parameters(), lr=lr,
             momentum=momentum, weight_decay=weight_decay)
-
-# writer_1 = SummaryWriter(log_dir + MODEL_NAME, flush_secs=30)
+writer_1 = SummaryWriter(os.path.join(log_dir, MODEL_NAME), flush_secs=30)
 
 if SAVE:
     import os
@@ -180,17 +164,17 @@ def train(epoch: int):
         optim.step()
         step += 1
 
-    # writer_1.add_scalar('loss(train)', loss.item(),
-    #                     iter_head + (epoch+1)*iter_per_epoch)
+    writer_1.add_scalar('loss(train)', loss.item(),
+                        iter_head + (epoch+1)*iter_per_epoch)
 
-    # if type_ != 'sng':
-    #     if type_ != 'single':
-    #         for i in range(0, 8):
-    #             writer_1.add_scalar(f's{i}', model.df_solver._frac.s[i].item(),
-    #                                 iter_head + (epoch+1)*iter_per_epoch)
-    #     else:
-    #         writer_1.add_scalar('s', model.df_solver._frac.s.item(),
-    #                             iter_head + (epoch+1)*iter_per_epoch)
+    if type_ != 'sng':
+        if type_ != 'single':
+            for i in range(0, 8):
+                writer_1.add_scalar(f's{i}', model.df_solver.bc_filter.s[i].item(),
+                                    iter_head + (epoch+1)*iter_per_epoch)
+        else:
+            writer_1.add_scalar('s', model.df_solver.bc_filter.s.item(),
+                                iter_head + (epoch+1)*iter_per_epoch)
 
     if SAVE:
         torch.save(model.state_dict(), checkpoint_path)
@@ -220,12 +204,12 @@ def validate(epoch):
 
         loss_mean = sum(losses) / len(losses)
 
-    # writer_1.add_scalar('loss(validate)', loss_mean, iter_head + (epoch + 1)*iter_per_epoch)
+    writer_1.add_scalar('loss(validate)', loss_mean, iter_head + (epoch + 1)*iter_per_epoch)
 
 
 for epoch in trange(0, n_epoch, desc='Training', unit='epoch'):
     train(epoch)
     validate(epoch)
 
-# writer_1.close()
+writer_1.close()
 print("Done.")

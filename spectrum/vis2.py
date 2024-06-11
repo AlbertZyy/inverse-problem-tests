@@ -3,14 +3,16 @@ import sys
 
 sys.path.append('./src')
 
+import numpy as np
 import torch
 from torch import Tensor
 from matplotlib import pyplot as plt
 
+from fealpy.torch.mesh import TriangleMesh
+
 from fractional import Fractional
-from data_feature import MultiChannelDataFeature
-from fdm import LaplaceFDMSolver
-from dataset import TPZDataset, NPZDataset
+from fem import LaplaceFEMSolver, EITDataPreprocessor
+from dataset import NPYDataset
 
 
 def get_energy(alpha: Tensor):
@@ -24,22 +26,24 @@ EXT = 63
 H = 2./EXT
 
 frac = Fractional(252)
-frac.from_npz(r'data\laplace_beltrami_63_63.npz')
-frac.initialize(-0.75)
+frac.from_npz('data/laplace_beltrami_63_63.npz')
+frac.initialize(0.75)
 freq = frac.w[::2].sqrt()
 
-df_solver = MultiChannelDataFeature(
-    LaplaceFDMSolver([EXT, EXT], [H, H]),
-    Fractional(252)
-)
-df_solver._frac.from_npz(r'data\laplace_beltrami_63_63.npz')
-df_solver._frac.initialize(0.75)
-dataset = NPZDataset(r'data\gdgn_cir3_e64_64_c8_validate', names=10,
-                     channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'])
-data = dataset[0][0]
-gnvn = df_solver.gd2gn_diff(data[None, ...])[0]
+mesh = TriangleMesh.from_box([-1, 1, -1, 1], EXT, EXT)
+solver = LaplaceFEMSolver(mesh, p=1)
+df_prepro = EITDataPreprocessor(solver)
+
+dataset = NPYDataset('data/cir3_e64_64_c8/gd', names=[str(i) for i in range(100)])
+gd = dataset[15]
+gn = torch.from_numpy(np.load('data/cir3_e64_64_c8/gn.npy'))
+data = torch.stack([gd, gn], dim=-2)
+
+gnvn = df_prepro(data[None, ...]).squeeze_(0)
+
 energy1 = get_energy(frac.decompose(gnvn))
-gnvn2 = df_solver._frac(gnvn)
+
+gnvn2 = frac(gnvn)
 energy2 = get_energy(frac.decompose(gnvn2))
 
 fig = plt.figure(figsize=(15, 5))
@@ -65,6 +69,6 @@ axes.set_xlabel('Frequency', fontsize=14)
 axes.set_ylabel('Energy', fontsize=14)
 axes.set_title('Spectrum of gn-vn after frac-LB (s=0.75)', fontsize=16)
 
-plt.savefig('spectrum/figures/vis2.png')
+plt.savefig('spectrum/figures/vis2_torch.png')
 
 plt.show()

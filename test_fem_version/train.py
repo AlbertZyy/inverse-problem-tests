@@ -140,6 +140,7 @@ if SAVE:
         os.makedirs(checkpoint_dir)
 
 def train(epoch: int):
+    model.train()
     step = 0
     sampler = RandomSampler(train_data_dataset)
     batch_sampler = BatchSampler(sampler, batch_size=data_conf['train_batch_size'], drop_last=False)
@@ -181,6 +182,7 @@ def train(epoch: int):
 
 
 def validate(epoch):
+    model.eval()
     sampler = RandomSampler(validate_data_dataset)
     batch_sampler = BatchSampler(sampler, batch_size=data_conf['validate_batch_size'], drop_last=False)
     losses = []

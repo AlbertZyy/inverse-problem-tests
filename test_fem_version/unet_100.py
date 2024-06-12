@@ -97,9 +97,10 @@ class RevModel(nn.Module):
     def __init__(self, n_channel: int, mesh: TriangleMesh, frac: nn.Module,
                  *, network_dtype=float32) -> None:
         super().__init__()
+        self.n_channel = n_channel
         solver = LaplaceFEMSolver(mesh, p=1)
         self.df_prepor = EITDataPreprocessor(solver)
-        self.df_solver = DataFeatureFEMSolver(solver, bc_filter=frac) # [N, 16, 64, 64]
+        self.df_solver = DataFeatureFEMSolver(solver, bc_filter=frac) # [N, 8, 64*64]
         self.bn = nn.BatchNorm2d(n_channel, momentum=0.01, dtype=mesh.ftype)
         self.coordinate = mesh.entity('node').reshape(64, 64, 2).permute(2, 0, 1) # [2, 64, 64]
         self.unet = Unet(n_channel+2, dtype=network_dtype)
@@ -108,9 +109,9 @@ class RevModel(nn.Module):
     def forward(self, input: Tensor):
         N = input.shape[0]
         coor = self.coordinate[None, ...].repeat(N, 1, 1, 1)
-        input = self.df_prepor(input)
-        phi = self.df_solver(input).reshape(N, 8, 64, 64)
+        gnvn = self.df_prepor(input)
         del input
+        phi = self.df_solver(gnvn).reshape(N, self.n_channel, 64, 64)
         phi = self.bn(phi)
         phi = torch.cat([phi, coor], dim=1)
         del coor

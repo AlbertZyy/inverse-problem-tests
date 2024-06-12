@@ -6,13 +6,14 @@ sys.path.append('./src')
 import numpy as np
 import torch
 from torch import Tensor
+from torch.nn import BatchNorm1d
 from matplotlib import pyplot as plt
 
 from fealpy.torch.mesh import TriangleMesh
 
 from fractional import Fractional
 from fem import LaplaceFEMSolver, EITDataPreprocessor
-from dataset import NPYDataset
+from dataset import NPYDataset, NPZDataset
 
 
 def get_energy(alpha: Tensor):
@@ -26,7 +27,7 @@ EXT = 63
 H = 2./EXT
 
 frac = Fractional(252)
-frac.from_npz('data/laplace_beltrami_63_63.npz')
+frac.from_npz('data/laplace_beltrami_63_63_torch.npz')
 frac.initialize(0.75)
 freq = frac.w[::2].sqrt()
 
@@ -34,12 +35,20 @@ mesh = TriangleMesh.from_box([-1, 1, -1, 1], EXT, EXT)
 solver = LaplaceFEMSolver(mesh, p=1)
 df_prepro = EITDataPreprocessor(solver)
 
+###
+# cdata = NPZDataset('data/gdgn_cir3_e64_64_c8_train', names=[str(i) for i in range(100)],
+#                    channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'])
+# gn0 = cdata[0][0][:, 1, :]
+###
+
 dataset = NPYDataset('data/cir3_e64_64_c8/gd', names=[str(i) for i in range(100)])
-gd = dataset[15]
+gd = dataset[75]
 gn = torch.from_numpy(np.load('data/cir3_e64_64_c8/gn.npy'))
 data = torch.stack([gd, gn], dim=-2)
 
-gnvn = df_prepro(data[None, ...]).squeeze_(0)
+gnvn = df_prepro(data[None, ...])
+
+print(gnvn)
 
 energy1 = get_energy(frac.decompose(gnvn))
 

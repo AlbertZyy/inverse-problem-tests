@@ -41,14 +41,16 @@ df_prepro = EITDataPreprocessor(solver)
 # gn0 = cdata[0][0][:, 1, :]
 ###
 
+# bn = BatchNorm1d(8, affine=False, dtype=mesh.ftype)
+
 dataset = NPYDataset('data/cir3_e64_64_c8/gd', names=[str(i) for i in range(100)])
 gd = dataset[75]
 gn = torch.from_numpy(np.load('data/cir3_e64_64_c8/gn.npy'))
 data = torch.stack([gd, gn], dim=-2)
 
-gnvn = df_prepro(data[None, ...])
+gnvn = df_prepro(data[None, ...]).squeeze(0)
 
-print(gnvn)
+# gnvn = bn(gnvn)
 
 energy1 = get_energy(frac.decompose(gnvn))
 

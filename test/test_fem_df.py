@@ -1,37 +1,42 @@
+"""Calculate the residual in the data feature solution."""
 
 import sys
 sys.path.append("./src")
 
 import numpy as np
 import torch
+from torch.utils.data import RandomSampler, BatchSampler
 from fealpy.torch.mesh import TriangleMesh
+from tqdm import tqdm
 
-from fem import DataFeatureFEMSolver
-from dataset import NPZDataset
+from fem import DataFeatureFEMSolver, EITDataPreprocessor, LaplaceFEMSolver
+from dataset import NPYDataset
 
 
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 EXT = 63
 
 mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=EXT, ny=EXT, device=DEVICE)
-df_solver = DataFeatureFEMSolver(mesh, p=1)
-dataset = NPZDataset('D:\\Data\\gdgn_cir3_e64_64_c8_validate',
-                     channel_keys=['gd'])
-gn = np.load('D:\\Data\\gdgn_cir3_e64_64_c8_validate\\gn.npy')
-gn = torch.from_numpy(gn)
-gd = dataset[0][0]
-data = torch.stack([gd, gn], dim=1).to(DEVICE)
-output = df_solver(data.unsqueeze(0))
-BATCH, CHANNEL = output.shape[:2]
-output = output.reshape(BATCH, CHANNEL, EXT+1, EXT+1)
+solver = LaplaceFEMSolver(mesh, p=1, reserve_matrix=True)
+df_prepro = EITDataPreprocessor(solver)
+df_solver = DataFeatureFEMSolver(solver)
+dataset = NPYDataset('data/cir3_e64_64_c8/gd', names=[str(i) for i in range(200)])
+gn_ = torch.from_numpy(np.load('data/cir3_e64_64_c8/gn.npy'))
 
+sampler = RandomSampler(dataset)
+batch_sampler = BatchSampler(sampler, batch_size=100, drop_last=False)
 
-from matplotlib import pyplot as plt
+vuh_res = []
+phi_res = []
 
-fig = plt.figure(figsize=(12, 6))
+for indices in tqdm(batch_sampler):
+    gd = dataset.__getitems__(indices)
+    gn = gn_.unsqueeze(0).broadcast_to(gd.shape)
+    data = torch.stack([gd, gn], dim=-2).to(DEVICE)
+    gnvn = df_prepro(data)
+    vuh_res.append(solver.residual_fd(df_prepro.vuh).item())
+    phi = df_solver(gnvn)
+    phi_res.append(solver.residual_fn(df_solver.img).item())
 
-for i in range(CHANNEL):
-    axes = fig.add_subplot(2, 4, i+1)
-    axes.pcolormesh(output[0, i, :, :].detach().cpu().numpy(), cmap='jet')
-
-plt.show()
+print(sum(vuh_res) / len(vuh_res))
+print(sum(phi_res) / len(phi_res))

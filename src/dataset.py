@@ -296,6 +296,12 @@ class NPYDataset(Dataset):
     def read_batch(self, names: Sequence[str]):
         return [self.read_data(name) for name in names]
 
+    def __getitems__(self, indices: Sequence[int]):
+        samples = []
+        for index in indices:
+            sample = self.read_data(self.names[index])
+            samples.append(sample)
+        return torch.stack(samples, dim=0)
 
 class TPYDataset(NPYDataset):
     data: Tensor

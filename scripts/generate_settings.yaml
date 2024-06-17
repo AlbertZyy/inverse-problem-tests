@@ -1,7 +1,7 @@
 # Config file for fealpy/app/eit/box_tri_generate.py
 
-head: 12000
-tail: 60000
+head: 0
+tail: 12000
 
 data:
   sigma: [10., 1.]
@@ -9,7 +9,7 @@ data:
   num_cir: 3
   freq: [1, 2, 3, 4, 5, 6, 8, 16]
   dtype: 'float64'
-  device: 'cpu'
+  device: 'cuda:0'
 
 fem:
   p: 1

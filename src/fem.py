@@ -21,11 +21,13 @@ logger.setLevel('WARNING')
 
 
 class LaplaceFEMSolver():
-    def __init__(self, mesh: TriangleMesh, p: int=1, q: Optional[int]=None) -> None:
+    def __init__(self, mesh: TriangleMesh, p: int=1, q: Optional[int]=None,
+                 reserve_matrix=False) -> None:
         q = q or p + 2
         self.space = LagrangeFESpace(mesh, p=p)
         self.dtype = mesh.ftype
         self.device = mesh.device
+        self.reserve_matrix = reserve_matrix
 
         # Generate left-hand-size matrix and define integrators
         bform = BilinearForm(self.space)
@@ -35,17 +37,14 @@ class LaplaceFEMSolver():
         self.bsi = ScalarBoundarySourceIntegrator(None, q=q, zero_integral=True, batched=True)
 
         # fetch some constants
-        self.NUM_NODES = mesh.number_of_nodes()
-        self.bd_node = mesh.ds.boundary_node_index()
-        self.bd_face = mesh.ds.boundary_face_index()
-        self.bd_face2node = mesh.entity('face', index=self.bd_face)
+        self.bd_face = mesh.boundary_face_index()
         self.bd_en = mesh.edge_unit_normal(index=self.bd_face)
-
         self.bd_dof_flag = self.space.is_boundary_dof()
-        self.cell2dof = self.space.cell_to_dof()
 
     def _init_gd(self):
         A_d = self.dbc.apply_matrix(self._A).to_dense()
+        if self.reserve_matrix:
+            self.A_d = A_d
         self.A_d_LU, self.pivots_d = lu_factor(A_d)
 
     def _init_gn(self):
@@ -60,6 +59,8 @@ class LaplaceFEMSolver():
             cat([A, c.T], dim=1),
             cat([c, ZERO], dim=1)
         ], dim=0)
+        if self.reserve_matrix:
+            self.A_n = A_n
         self.A_n_LU, self.pivots_n = lu_factor(A_n)
 
     def solve_from_gd(self, gd: Tensor, batch_size: int=0) -> Tensor:
@@ -79,6 +80,7 @@ class LaplaceFEMSolver():
         lform = LinearForm(self.space, batch_size=batch_size)
         f = lform.assembly() # An zero tensor
         f = self.dbc.apply_vector(f, self._A, gd=gd)
+        self._latest_fd = f
         uh = lu_solve(self.A_d_LU, self.pivots_d, f, left=False)
         return uh
 
@@ -111,6 +113,7 @@ class LaplaceFEMSolver():
         else:
             raise RuntimeError(f"Invalid f.ndim {f.ndim}.")
 
+        self._latest_fn = f
         uh = lu_solve(self.A_n_LU, self.pivots_n, f, left=False)
         return uh[..., :-1]
 
@@ -127,13 +130,14 @@ class LaplaceFEMSolver():
 
     def _init_normal(self):
         ldof = self.space.number_of_local_dofs()
+        cell2dof = self.space.cell_to_dof()
         GD = self.space.mesh.geo_dimension()
 
         bcs, ws, _, fm, index = self.bsi.fetch(self.space)
-        bd_face2cell = self.space.mesh.ds.face2cell[index, :]
+        bd_face2cell = self.space.mesh.face2cell[index, :]
         bd_local_idx = bd_face2cell[:, 2]
         bd_left_cell = bd_face2cell[:, 0]
-        self.bd_left_cell_dof = self.cell2dof[bd_left_cell]
+        self.bd_left_cell_dof = cell2dof[bd_left_cell]
         gphi_shape = (ws.shape[0], fm.shape[0], ldof, GD)
         gphi = torch.zeros(gphi_shape, dtype=self.dtype, device=self.device)
 
@@ -179,8 +183,9 @@ class LaplaceFEMSolver():
         self.bd_face2dof = face2dof[self.bd_face]
 
     def solve_from_gnf(self, boundary_local: Optional[Tensor],
-                       boundary_dof: Optional[Tensor],
-                       *, f_only=False) -> Tensor:
+                       boundary_dof: Optional[Tensor], *,
+                       f_only=False,
+                       zero_integral=False) -> Tensor:
         """Solve Laplace equation with Neumann boundary condition geven
         the right hand side vector `f`.
 
@@ -223,6 +228,9 @@ class LaplaceFEMSolver():
             f = torch.zeros((batch_size, gdof), dtype=self.dtype, device=self.device)
             f[:, self.bd_dof_flag] = boundary_dof
 
+        if zero_integral:
+            f[:, self.bd_dof_flag] -= f[:, self.bd_dof_flag].mean(dim=-1, keepdim=True)
+
         if f_only:
             return f
 
@@ -235,6 +243,7 @@ class LaplaceFEMSolver():
         else:
             raise RuntimeError(f"Invalid f.ndim {f.ndim}.")
 
+        self._latest_fn = f
         uh = lu_solve(self.A_n_LU, self.pivots_n, f, left=False)
         return uh[..., :-1]
 
@@ -247,22 +256,24 @@ class LaplaceFEMSolver():
         Returns:
             Tensor: A 1-d tensor sized the number of nodes.
         """
+        self.NUM_NODES = self.space.mesh.number_of_nodes()
         return uh[..., :self.NUM_NODES]
 
-    def boundary_node_to_face(self, value: Tensor) -> Tensor:
-        """Aggregate values on boundary nodes to faces.
+    def residual_fd(self, uh: Tensor) -> Tensor:
+        if not hasattr(self, 'A_d'):
+            raise RuntimeError("A_d is not initialized. Please call `init_gd` first "
+                               "and make sure reserve_matrix is set to True")
+        diff = uh @ self.A_d - self._latest_fd
+        return diff.norm(dim=-1).mean()
 
-        Args:
-            value (Tensor): Value on boundary nodes, shaped [batch_size, boundary nodes,].
-
-        Returns:
-            Tensor: Value on boundary faces, shaped [batch_size, boundary faces,].
-        """
-        NUM_NODES = self.NUM_NODES
-        shape = value.shape[:-1] + (NUM_NODES,)
-        val = torch.zeros(shape, dtype=value.dtype, device=value.device)
-        val[..., self.bd_node] = value
-        return val[..., self.bd_face2node].mean(dim=-1)
+    def residual_fn(self, uh: Tensor) -> Tensor:
+        if not hasattr(self, 'A_n'):
+            raise RuntimeError("A_n is not initialized. Please call `init_gn` first "
+                               "and make sure reserve_matrix is set to True")
+        ZERO = torch.zeros((uh.shape[0], 1), dtype=self.dtype, device=self.device)
+        uh = torch.cat([uh, ZERO], dim=-1)
+        diff = uh @ self.A_n - self._latest_fn
+        return diff.norm(dim=-1).mean()
 
 
 TensorFunc = Callable[[Tensor], Tensor]
@@ -278,6 +289,7 @@ class EITDataPreprocessor(nn.Module):
         """
         super().__init__()
         self.solver = solver
+        self.vuh = None
 
     __call__: TensorFunc
 
@@ -290,7 +302,8 @@ class EITDataPreprocessor(nn.Module):
         gd, gn = input[:, 0, :], input[:, 1, :] # [B*CH, NN_bd]
         vuh = solver.solve_from_gd(gd, BATCH*CHANNEL) # [B*CH, gdof]
         vn = solver.normal_derivative(vuh) # [B*CH, NF_bd, ldof]
-        gnvn = solver.solve_from_gnf(-vn, gn, f_only=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
+        gnvn = solver.solve_from_gnf(-vn, gn, f_only=True, zero_integral=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
+        self.vuh = vuh
 
         return gnvn.reshape(BATCH, CHANNEL, -1) # [B, CH, bddof]
 
@@ -325,6 +338,7 @@ class DataFeatureFEMSolver(nn.Module):
         gnvn = gnvn.reshape(-1, NNBD) # [B*CH, NN_bd]
         val = self.solver.solve_from_gnf(None, gnvn) # [B*CH, gdof]
         img = solver.value_on_nodes(val) # [B*CH, NN]
+        self.img = img
 
         # NOTE: Return the result shape
         return img.reshape(BATCH, CHANNEL, -1) # [B, CH, NN]

@@ -1,7 +1,7 @@
 # Config file for fealpy/app/eit/box_tri_generate.py
 
-head: 0
-tail: 10000
+head: 12000
+tail: 60000
 
 data:
   sigma: [10., 1.]

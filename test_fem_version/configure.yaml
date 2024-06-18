@@ -1,0 +1,139 @@
+
+data:
+  train_set_location: "data/cir3_e64_64_c8/"
+  train_set_start: 0
+  train_set_end: 100
+  train_batch_size: 10
+
+  validate_set_location: "data/cir3_e64_64_c8/"
+  validate_set_start: 10000
+  validate_set_end: 10020
+  validate_batch_size: 10
+
+
+iter_head: 0
+epochs: 5
+
+lr: 0.001
+weight_decay: 0.000000001
+momentum: 0.9
+
+log_dir: "./test_fem_version/logs/"
+save: True
+checkpoint_dir: "./test_fem_version/ckpts_test/"
+
+
+defaults:
+  blank: None
+
+
+task1:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_multi'
+  type_: 'multi'
+
+
+task2:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_single'
+  type_: 'single'
+
+
+task3:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_sng'
+  type_: 'sng'
+
+
+task4:
+  noise: 0.01
+  use_noise_filter: False
+  tag: 'gn01_multi'
+  type_: 'multi'
+
+
+task5:
+  noise: 0.01
+  use_noise_filter: False
+  tag: 'gn01_single'
+  type_: 'single'
+
+
+task6:
+  noise: 0.01
+  use_noise_filter: False
+  tag: 'gn01_sng'
+  type_: 'sng'
+
+
+task7:
+  noise: 0.05
+  use_noise_filter: False
+  tag: 'gn05_multi'
+  type_: 'multi'
+
+
+task8:
+  noise: 0.05
+  use_noise_filter: False
+  tag: 'gn05_single'
+  type_: 'single'
+
+
+task9:
+  noise: 0.05
+  use_noise_filter: False
+  tag: 'gn05_sng'
+  type_: 'sng'
+
+
+task10:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_multi'
+  type_: 'multi'
+
+
+task11:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_single'
+  type_: 'single'
+
+
+task12:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_sng'
+  type_: 'sng'
+
+
+task13:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_multi'
+  type_: 'multi'
+
+
+task14:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_single'
+  type_: 'single'
+
+
+task15:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_sng'
+  type_: 'sng'
+
+
+argpools:
+  gpu_id: [0, 1, 2, 3, 4, 5, 6]
+
+
+pool_size: 2

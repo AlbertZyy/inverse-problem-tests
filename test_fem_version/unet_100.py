@@ -150,18 +150,19 @@ def build_model(device: device, tag: str, type_: str, ckpts_path: Optional[str]=
 
     FULL_NAME = (NAME + '_' + tag) if tag else NAME
 
-    print(f"Model built: {FULL_NAME}, in device: {device}")
+    # print(f"Model built: {FULL_NAME}, in device: {device}")
 
     n_p = sum(p.numel() for p in model.unet.parameters())
-    print(f"Number of unet parameters: {n_p/1e6:.2f}M")
+    # print(f"Number of unet parameters: {n_p/1e6:.2f}M")
 
     try:
         ckpts_path = ckpts_path or "./test_fem_version/ckpts"
         ckpts_path = os.path.join(ckpts_path, f"{FULL_NAME}.pth")
         model.load_state_dict(torch.load(ckpts_path, map_location=device))
-        print(f"Checkpoint loaded.")
+        # print(f"Checkpoint loaded.")
     except FileNotFoundError:
-        print(f"No checkpoint found.")
+        # print(f"No checkpoint found.")
+        pass
 
     return model, FULL_NAME
 

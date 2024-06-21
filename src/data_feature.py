@@ -51,7 +51,7 @@ class DataFeatureFDMSolver(Module):
 
 
 class MultiChannelDataFeature(Module):
-    def __init__(self, laplace_solver: LaplaceFDMSolver, frac_lb: Module) -> None:
+    def __init__(self, laplace_solver: LaplaceFDMSolver, frac_lb: Optional[Module]=None) -> None:
         super().__init__()
         self._solver = laplace_solver
         self._frac = frac_lb
@@ -93,14 +93,18 @@ class MultiChannelDataFeature(Module):
         gd, gn = data[:, 0, :], data[:, 1, :] # [N*C, NN_bd]
         vuh = self._solver.solve_from_gd(gd) # [N*C, NN]
         vn = self._solver.normal_derivative(vuh) # [N*C, NN_bd]
+        gnvn = gn - vn
 
-        # NOTE: Restore the Batch axis to send to the fractional.
-        _frac_input_buffer = (gn - vn).reshape(BATCH, CHANNEL, NNBD)
-        gnvn = self._frac(_frac_input_buffer) # [N, C, NN_bd]
-        self._frac_input_buffer = _frac_input_buffer
+        if self._frac is not None:
+            # NOTE: Restore the Batch axis to send to the fractional.
+            _frac_input_buffer = gnvn.reshape(BATCH, CHANNEL, NNBD)
+            gnvn = self._frac(_frac_input_buffer) # [N, C, NN_bd]
+            self._frac_input_buffer = _frac_input_buffer
 
-        # NOTE: Merge the Batch and Channel axis again for the FDM solver.
-        val = self._solver.solve_from_gn(gnvn.reshape(-1, NNBD)) # [N*C, NN]
+            # NOTE: Merge the Batch and Channel axis again for the FDM solver.
+            gnvn = gnvn.reshape(-1, NNBD)
+
+        val = self._solver.solve_from_gn(gnvn) # [N*C, NN]
 
         # NOTE: Return the result as a 4-d image.
         MESH = self._solver.indexing.shape

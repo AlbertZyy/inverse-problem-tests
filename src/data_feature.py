@@ -92,6 +92,7 @@ class MultiChannelDataFeature(Module):
         data = data.reshape(-1, 2, NNBD) # [N*C, 2, NN_bd]
         gd, gn = data[:, 0, :], data[:, 1, :] # [N*C, NN_bd]
         vuh = self._solver.solve_from_gd(gd) # [N*C, NN]
+        self.vuh = vuh
         vn = self._solver.normal_derivative(vuh) # [N*C, NN_bd]
         gnvn = gn - vn
 

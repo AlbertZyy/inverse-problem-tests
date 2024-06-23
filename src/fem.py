@@ -128,35 +128,35 @@ class LaplaceFEMSolver():
         """
         return uh[..., self.bd_dof_flag]
 
-    def _init_normal(self):
-        ldof = self.space.number_of_local_dofs()
-        cell2dof = self.space.cell_to_dof()
-        GD = self.space.mesh.geo_dimension()
+    # def _init_normal(self):
+    #     ldof = self.space.number_of_local_dofs()
+    #     cell2dof = self.space.cell_to_dof()
+    #     GD = self.space.mesh.geo_dimension()
 
-        bcs, ws, _, fm, index = self.bsi.fetch(self.space)
-        bd_face2cell = self.space.mesh.face2cell[index, :]
-        bd_local_idx = bd_face2cell[:, 2]
-        bd_left_cell = bd_face2cell[:, 0]
-        self.bd_left_cell_dof = cell2dof[bd_left_cell]
-        gphi_shape = (ws.shape[0], fm.shape[0], ldof, GD)
-        gphi = torch.zeros(gphi_shape, dtype=self.dtype, device=self.device)
+    #     bcs, ws, _, fm, index = self.bsi.fetch(self.space)
+    #     bd_face2cell = self.space.mesh.face2cell[index, :]
+    #     bd_local_idx = bd_face2cell[:, 2]
+    #     bd_left_cell = bd_face2cell[:, 0]
+    #     self.bd_left_cell_dof = cell2dof[bd_left_cell]
+    #     gphi_shape = (fm.shape[0], ws.shape[0], ldof, GD) # (bd_F, Q, I3, GD)
+    #     gphi = torch.zeros(gphi_shape, dtype=self.dtype, device=self.device)
 
-        for i in range(3):
-            sub_idx = (bd_local_idx == i).nonzero(as_tuple=True)[0] # 边界边中局部编号是 i 的边
-            if sub_idx.numel() == 0:
-                continue
+    #     for i in range(3):
+    #         sub_idx = (bd_local_idx == i).nonzero(as_tuple=True)[0] # 边界边中局部编号是 i 的边
+    #         if sub_idx.numel() == 0:
+    #             continue
 
-            ZERO = torch.zeros((bcs.shape[0], 1), dtype=bcs.dtype, device=bcs.device)
-            new_bcs = torch.cat([bcs[:, :i], ZERO, bcs[:, i:]], dim=1)
-            if i == 1:
-                new_bcs = new_bcs.flip(dims=(1,))
-            assert new_bcs.shape == (bcs.shape[0], 3)
+    #         ZERO = torch.zeros((bcs.shape[0], 1), dtype=bcs.dtype, device=bcs.device)
+    #         new_bcs = torch.cat([bcs[:, :i], ZERO, bcs[:, i:]], dim=1)
+    #         if i == 1:
+    #             new_bcs = new_bcs.flip(dims=(1,))
+    #         assert new_bcs.shape == (bcs.shape[0], 3)
 
-            sub_lcell = bd_left_cell[sub_idx] # 边界边中局部编号是 i 的边 的 左边单元全局编号
-            sub_gphi = self.space.grad_basis(new_bcs, index=sub_lcell, variable='x') # (Q, sub_F, I3, GD)
-            gphi[:, sub_idx, :, :] = sub_gphi
+    #         sub_lcell = bd_left_cell[sub_idx] # 边界边中局部编号是 i 的边 的 左边单元全局编号
+    #         sub_gphi = self.space.grad_basis(new_bcs, index=sub_lcell, variable='x') # (sub_F, Q, I3, GD)
+    #         gphi[sub_idx, :, :, :] = sub_gphi
 
-        self.bd_cell_gphi_on_bd_face = gphi # (Q, bd_F, I3, GD)
+    #     self.bd_cell_gphi_on_bd_face = gphi # (bd_F, Q, I3, GD)
 
     def normal_derivative(self, uh: Tensor) -> Tensor:
         """Calculate normal derivatives on boundary interpolation points.
@@ -167,16 +167,34 @@ class LaplaceFEMSolver():
         Returns:
             Tensor: A 2-d tensor shaped (Batch, bd_F, ldof).
         """
-        if not hasattr(self, 'bd_cell_gphi_on_bd_face'):
-            self._init_normal()
+        # if not hasattr(self, 'bd_cell_gphi_on_bd_face'):
+        #     self._init_normal()
 
-        gphi = self.bd_cell_gphi_on_bd_face
-        _, ws, phi, fm, _ = self.bsi.fetch(self.space)
-        bd_left_cell_dof = self.bd_left_cell_dof
-        bd_uh = uh[..., bd_left_cell_dof] # (B, bd_F, I3)
-        result = torch.einsum('fm, qfim, ...fi -> ...qf', self.bd_en, gphi, bd_uh) # (B, Q, bd_F)
+        # gphi = self.bd_cell_gphi_on_bd_face
+        # _, ws, phi, fm, _ = self.bsi.fetch(self.space)
+        # bd_left_cell_dof = self.bd_left_cell_dof
+        # bd_uh = uh[..., bd_left_cell_dof] # (B, bd_F, I3)
+        # result = torch.einsum('fm, fqim, ...fi -> ...fq', self.bd_en, gphi, bd_uh) # (B, bd_F, Q)
 
-        return linear_integral(phi, ws, fm, result, batched=True) # (B, bd_F, I2)
+        # return linear_integral(phi, ws, fm, result, batched=True) # (B, bd_F, I2)
+
+        Auh_indices = self._A.indices()
+
+        if uh.ndim == 2:
+            A_values = self._A.values()[None, :]
+            indices = Auh_indices[None, 0, :].broadcast_to(Auh_values.shape)
+        else:
+            A_values = self._A.values()
+            indices = Auh_indices[0, :]
+
+        Auh_values = A_values * uh[..., Auh_indices[1, :]] # (B, gdof)
+        Auh = torch.zeros_like(uh, requires_grad=False)
+        Auh.scatter_add_(-1, indices, Auh_values)
+
+        return Auh[..., self.bd_dof_flag]
+
+        # result = torch.einsum('fqjm, fqim, ...fi -> ...fqj', gphi, gphi, bd_uh) # (B, bd_F, Q, I3)
+        # return linear_integral(phi, ws, fm, result, batched=True)
 
     def _init_solve_from_gnf(self):
         face2dof = self.space.face_to_dof()
@@ -301,8 +319,8 @@ class EITDataPreprocessor(nn.Module):
         input = input.reshape(-1, 2, NNBD) # [B*CH, 2, NN_bd]
         gd, gn = input[:, 0, :], input[:, 1, :] # [B*CH, NN_bd]
         vuh = solver.solve_from_gd(gd, BATCH*CHANNEL) # [B*CH, gdof]
-        vn = solver.normal_derivative(vuh) # [B*CH, NF_bd, ldof]
-        gnvn = solver.solve_from_gnf(-vn, gn, f_only=True, zero_integral=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
+        vn = solver.normal_derivative(vuh) # [B*CH, bddof]
+        gnvn = solver.solve_from_gnf(None, gn-vn, f_only=True)[:, solver.bd_dof_flag] # [B*CH, bddof]
         self.vuh = vuh
 
         return gnvn.reshape(BATCH, CHANNEL, -1) # [B, CH, bddof]

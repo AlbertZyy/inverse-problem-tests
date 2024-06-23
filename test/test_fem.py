@@ -29,10 +29,10 @@ uh = solver.solve_from_gn(neumann, batch_size=BATCH_SIZE)
 original = solver._latest_gn_f[:, solver.bd_dof_flag] # (B, bddof)
 calculated = solver.normal_derivative(uh)
 
-err_bddof = solver.solve_from_gnf(calculated, -original, f_only=True)
+err_bddof = solver.solve_from_gnf(None, calculated - original, f_only=True)
 err_bddof = err_bddof[:, solver.bd_dof_flag]
 print(err_bddof.pow(2).mean(dim=-1).sqrt().mean(dim=0).item())
 
-uh2 = solver.solve_from_gnf(calculated, None)
+uh2 = solver.solve_from_gnf(None, calculated)
 err = (uh2 - uh).pow(2).mean(dim=-1).sqrt()
 print(err.mean().item())

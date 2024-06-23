@@ -14,7 +14,6 @@ from fealpy.torch.fem import (
     ScalarBoundarySourceIntegrator,
     DirichletBC,
 )
-from fealpy.torch.functional import linear_integral
 from fealpy.torch import logger
 
 logger.setLevel('WARNING')
@@ -182,7 +181,8 @@ class LaplaceFEMSolver():
 
         if uh.ndim == 2:
             A_values = self._A.values()[None, :]
-            indices = Auh_indices[None, 0, :].broadcast_to(Auh_values.shape)
+            shape = uh.shape[:-1] + (A_values.shape[-1], )
+            indices = Auh_indices[None, 0, :].broadcast_to(shape)
         else:
             A_values = self._A.values()
             indices = Auh_indices[0, :]

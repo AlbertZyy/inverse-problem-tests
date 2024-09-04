@@ -141,6 +141,7 @@ cython_debug/
 logs/
 checkpoints/
 ckpts/
+ckpts2/
 data/
 
 # vscode

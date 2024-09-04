@@ -4,7 +4,7 @@ import torch
 from fealpy.mesh import TriangleMesh as TMD
 
 
-CONTEXT = 'torch'
+CONTEXT = 'numpy'
 
 if CONTEXT == 'torch':
     from fealpy.torch.mesh import TriangleMesh
@@ -15,7 +15,7 @@ if CONTEXT == 'torch':
         ScalarSourceIntegrator,
         DirichletBC
     )
-    from fealpy.torch.solver import sparse_cg
+    from fealpy.torch.solver import sparse_cg as cg
     from torch import cos, pi
 
 elif CONTEXT == 'numpy':
@@ -27,13 +27,13 @@ elif CONTEXT == 'numpy':
         ScalarSourceIntegrator,
         DirichletBC
     )
-    from scipy.sparse.linalg import spsolve
+    from scipy.sparse.linalg import cg
     from numpy import cos, pi
 
 from fealpy.utils import timer
 from matplotlib import pyplot as plt
 
-NX, NY = 64, 64
+NX, NY = 128, 128
 
 def source(points):
     x = points[..., 0]
@@ -53,7 +53,7 @@ next(tmr)
 
 # build mesh and space
 mesh = TriangleMesh.from_box(nx=NX, ny=NY)
-space = LagrangeFESpace(mesh, p=3)
+space = LagrangeFESpace(mesh, p=1)
 tmr.send('mesh_and_space')
 
 # build forms and integrators
@@ -67,28 +67,26 @@ tmr.send('forms')
 A = bform.assembly()
 F = lform.assembly()
 tmr.send('assembly')
+del bform, lform
 
 # apply dirichlet bc
-if CONTEXT == 'torch':
-    uh = torch.zeros((space.number_of_global_dofs(), ), dtype=torch.float64)
-elif CONTEXT == 'numpy':
-    uh = np.zeros((space.number_of_global_dofs(), ), dtype=np.float64)
-
+uh = space.function()
 A, F = DirichletBC(space, solution).apply(A, F, uh)
 tmr.send('dirichlet')
 
 # solve
 if CONTEXT == 'torch':
     A = A.to_sparse_csr()
-    uh = sparse_cg(A, F, uh, maxiter=5000).detach().cpu().numpy()
+    uh = cg(A, F, uh, maxiter=5000, atol=1e-12, rtol=1e-8).numpy()
 
 elif CONTEXT == 'numpy':
-    uh = spsolve(A, F)
+    uh = cg(A, F, uh, maxiter=5000, tol=1e-8, atol=1e-12)
 
 tmr.send('solve')
 next(tmr)
+del A, F
 
-fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d')
-mesh_numpy.show_function(axes, uh, cmap='jet')
-plt.show()
+# fig = plt.figure()
+# axes = fig.add_subplot(111, projection='3d')
+# mesh_numpy.show_function(axes, uh, cmap='jet')
+# plt.show()

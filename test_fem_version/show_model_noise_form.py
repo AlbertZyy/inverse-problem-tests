@@ -1,7 +1,9 @@
+"""
+绘制单个样本的预测图形表格，包含各个模型（行）、各水平噪声（列）下的预测结果。
+"""
 
 import os
 import sys
-from typing import Callable, Dict, Optional
 from functools import reduce
 
 sys.path.append('./src')
@@ -10,7 +12,6 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
-from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 
 from common import loss_fn as cross_entropy
@@ -53,7 +54,7 @@ titles = [
     (4,  'Gaussian 5%',     0),
     (5,  'Low-freq 1%',     0),
     (6,  'Low-freq 5%',     0),
-    (7,  's=0',             90),
+    (7,  '$\gamma = 0$',    90),
     (13, 'Single',          90),
     (19, 'Multi',           90)
 ]
@@ -68,7 +69,6 @@ gn = torch.from_numpy(np.load('data/cir3_e64_64_c8/gn.npy')).to(device)
 label_set = NPZDataset("data/cir3_e64_64_c8/inclusion", [str(i) for i in range(1000)])
 
 
-REPEAT = 1
 save_dir = 'test_fem_version/figures/'
 use_noise_filter = True
 os.makedirs(save_dir, exist_ok=True)
@@ -96,7 +96,7 @@ for pos, tag, type_, noise_coef, noise_filter, ckpts_path in settings:
         fig = figs[i]
 
         gd = gd_set[i].to(device)
-        data = torch.stack([gd, gn], dim=-2)
+        data = torch.stack([gd, gn], dim=-2) # new memory
         label = label_set[i][-1].to(device)
 
         noise = torch.randn_like(data[..., 0, :]) * noise_coef

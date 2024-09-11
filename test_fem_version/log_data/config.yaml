@@ -1,0 +1,44 @@
+
+
+plot:
+  test_fem_version/log_data/u100_ln05_sng.csv:
+    xkey: 'Step'
+    ykey: 'loss(validate)'
+    args:
+      label: '$\gamma = 0$'
+      color: 'red'
+      linestyle: '-'
+      linewidth: 1
+
+  test_fem_version/log_data/u100_ln05_single.csv:
+    xkey: 'Step'
+    ykey: 'loss(validate)'
+    args:
+      label: 'single'
+      color: 'green'
+      linestyle: '-'
+      linewidth: 1
+
+  test_fem_version/log_data/u100_ln05_multi.csv:
+    xkey: 'Step'
+    ykey: 'loss(validate)'
+    args:
+      label: 'multi'
+      color: 'blue'
+      linestyle: '-'
+      linewidth: 1
+
+
+figsize: [8, 6]
+title: 'Validation Loss (5% Low-freq Noise)'
+
+xlog: False
+ylog: False
+
+ylim: [0.0, 0.05]
+yticks: [0.0, 0.01, 0.02, 0.03, 0.04, 0.05]
+
+xlabel: 'Iteration'
+ylabel: 'Loss'
+
+output: 'test_fem_version/figures/ln05.png'

@@ -1,0 +1,41 @@
+
+
+plot:
+  path/to/first.csv:
+    xkey: 'Step'
+    ykey: 'tag1'
+    args:
+      label: 'legend1'
+      color: 'red'
+      linestyle: '-'
+      linewidth: 2
+      marker: 'o'
+      markersize: 5
+      alpha: 0.8
+
+  path/to/second.csv:
+    xkey: 'Step'
+    ykey: 'tag2'
+    args:
+      label: 'legend1'
+      color: 'red'
+      linestyle: '-'
+      linewidth: 2
+      marker: 'o'
+      markersize: 5
+      alpha: 0.8
+
+
+figsize: [8, 6]
+title: 'Data Visualize'
+
+xlog: False
+ylog: False
+
+ylim: [0.0, 0.7]
+yticks: [0.0, 0.2, 0.4, 0.6]
+
+xlabel: 'Step'
+ylabel: 'Loss'
+
+output: 'path/to/output.png'

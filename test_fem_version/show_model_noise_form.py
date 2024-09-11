@@ -20,6 +20,7 @@ from unet_100 import build_model
 from dataset import NPZDataset, NPYDataset
 
 
+torch.manual_seed(-26)
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 low_pass = Fractional(252, device=device)
 low_pass.from_npz(r"./data/laplace_beltrami_63_63_torch.npz")
@@ -83,6 +84,7 @@ gs = GridSpec(figure_matrix[0], figure_matrix[1],
 x = np.linspace(-1, 1, 64)
 y = np.linspace(-1, 1, 64)
 X, Y = np.meshgrid(x, y, indexing='ij')
+NOISE = torch.randn((8, 252), dtype=torch.float64)
 
 for pos, tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     model, name = build_model(device, tag, type_, ckpts_path)
@@ -94,16 +96,15 @@ for pos, tag, type_, noise_coef, noise_filter, ckpts_path in settings:
     # for each sample/figure
     for i in ID:
         fig = figs[i]
-
         gd = gd_set[i].to(device)
         data = torch.stack([gd, gn], dim=-2) # new memory
         label = label_set[i][-1].to(device)
 
-        noise = torch.randn_like(data[..., 0, :]) * noise_coef
         if noise_filter:
-            noise = noise_filter(noise)
-        noise = data[..., 0, :] * noise
-        data[..., 0, :] += noise
+            noise_ = noise_filter(NOISE * noise_coef)
+        else:
+            noise_ = NOISE * noise_coef
+        data[:, 0, :] += data[:, 0, :] * noise_
 
         pred = model(data[None, ...])
         label = label.reshape(pred.shape).to(dtype=pred.dtype)

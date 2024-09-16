@@ -1,0 +1,28 @@
+
+data:
+  s:
+    csv_file: './test_fem_version/plot_data/nn/run-u100_nn_single-tag-s.csv'
+    marker: ''
+    linestyle: '-'
+    color: 'blue'
+
+
+smooth: 0.0
+xlog: False
+
+fig_name: 's evo'
+fig_size: [12, 9]
+title: 'Evolution of scalar s (no noise)'
+
+xlabel: 'iteration'
+ylabel: 'fractional order s'
+
+xlim: 'auto'
+ylim: [0.0, 0.7]
+ytick_num: 8
+
+index: 'None'
+slice: [0, 1000, 1]
+
+show: True
+save: './test_fem_version/figures/s_evo_nn_single.png'

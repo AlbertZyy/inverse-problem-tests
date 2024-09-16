@@ -21,8 +21,17 @@ data:
     linewidth: 1
     color: 'g'
 
+rectangle:
+  xy: [1000, 0.03]
+  width: 38500
+  height: 0.07
+  fill: False
+  color: 'k'
+  linestyle: '--'
+  linewidth: 2
 
-smooth: 0.8
+
+smooth: 0.0
 xlog: True
 ylog: True
 
@@ -33,11 +42,11 @@ title: 'Validation loss without noise'
 xlabel: 'iteration'
 ylabel: 'loss'
 
-xlim: 'auto'
-ylim: [0.03, 0.1]
-ytick_num: 8
+# xlim: 'auto'
+# ylim: [0.03, 0.1]
+# ytick_num: 8
 
 slice: [10, 1000, 1]
 
 show: True
-save: './test_fem_version/figures/validation_loss_evo_nn.png'
+save: './test_fem_version/figures/validation_loss_evo_nn_full.png'

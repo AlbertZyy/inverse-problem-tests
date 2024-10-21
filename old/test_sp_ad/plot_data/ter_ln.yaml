@@ -1,12 +1,12 @@
 
 data:
-  s = 0:
+  $\gamma = 0$:
     values:
       - 0.04506
       - 0.04349
       - 0.06077
     marker: 'd'
-    linestyle: '-'
+    linestyle: '--'
     linewidth: 1
     color: 'k'
 
@@ -16,7 +16,7 @@ data:
       - 0.0395
       - 0.05837
     marker: 'd'
-    linestyle: '-'
+    linestyle: '--'
     linewidth: 1
     color: 'r'
 
@@ -26,7 +26,7 @@ data:
       - 0.0383
       - 0.05552
     marker: 'd'
-    linestyle: '-'
+    linestyle: '--'
     linewidth: 1
     color: 'g'
 
@@ -47,4 +47,4 @@ ylim: [0.03, 0.07]
 ytick_num: 5
 
 show: True
-save: '.\test_sp_ad\figures\validation_loss_ter_ln.png'
+save: './old/test_sp_ad/figures/validation_loss_ter_ln.png'

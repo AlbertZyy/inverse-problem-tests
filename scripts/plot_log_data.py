@@ -52,8 +52,8 @@ def plot_data(config: Dict):
     if 'yticks' in config:
         ax.set_yticks(config['yticks'])
     # Set axis labels
-    ax.set_xlabel(config.get('xlabel', 'X'))
-    ax.set_ylabel(config.get('ylabel', 'Y'))
+    ax.set_xlabel(config.get('xlabel', 'X'), fontsize=14)
+    ax.set_ylabel(config.get('ylabel', 'Y'), fontsize=14)
 
     for file_path, plot_info in config['plot'].items():
         data = load_csv_data(file_path)
@@ -67,12 +67,17 @@ def plot_data(config: Dict):
         else:
             print(f"Warning: Data could not be loaded from file '{file_path}'.")
 
-    ax.legend()
+    ax.legend(fontsize=14)
+
+    ### add geometry
+    if 'rectangle' in config.keys():
+        ax.add_patch(plt.Rectangle(**config['rectangle']))
 
     if 'output' in config:
         os.makedirs(os.path.dirname(config['output']), exist_ok=True)
         plt.savefig(config['output'])
 
+    fig.tight_layout()
     plt.show()
 
 

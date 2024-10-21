@@ -11,12 +11,12 @@ import torch
 from torch.optim import SGD
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import RandomSampler, BatchSampler
+from torch.nn.functional import binary_cross_entropy
 from kokomi import Arrange
 from tqdm import tqdm, trange
 
 from lafemeit.model import build_eit_model, Fractional
 from lafemeit.utils import NPYDataset, NPZDataset, MemoryDataset
-from common import loss_fn
 
 
 ### parse args
@@ -60,7 +60,6 @@ print(f"  - weight decay: {weight_decay}", end='\n\n')
 
 
 def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
-    # print(tag, gpu_id)
     device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
     data_conf = config['data']
 
@@ -86,7 +85,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
         train_label_dataset._read_data,
         num_workers=0,
         device=device,
-        tqdm=False
+        tqdm=True
     )
 
     validate_data_dataset = NPYDataset(
@@ -98,7 +97,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
         validate_data_dataset.read_data,
         num_workers=0,
         device=device,
-        tqdm=False
+        tqdm=True
     )
 
     validate_label_dataset = NPZDataset(
@@ -111,7 +110,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
         validate_label_dataset._read_data,
         num_workers=0,
         device=device,
-        tqdm=False
+        tqdm=True
     )
 
     gn_origin = torch.from_numpy(
@@ -125,7 +124,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
         n_channel = 8,
         tag = tag,
         fractype = type_,
-        eigen_file = "data/laplace_beltrami_63_63_torch.npz",
+        eigen_file = "lafem/data/laplace_beltrami_63_63.npz",
         ckpts_path = "lafem/ckpts",
         device = device
     )
@@ -134,8 +133,8 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
     if use_noise_filter:
         noise_filter = Fractional(252, device=device)
-        noise_filter.from_npz(r"data/laplace_beltrami_63_63_torch.npz")
-        noise_filter.initialize(s=-0.75)
+        noise_filter.from_npz("lafem/data/laplace_beltrami_63_63.npz")
+        noise_filter.initialize(gamma=-0.75)
         noise_filter.gamma.requires_grad_(False)
     else:
         noise_filter = None
@@ -195,7 +194,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
             y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
             label = train_label_dataset[indices].reshape(y_out.shape)
-            loss = loss_fn(y_out, label.to(dtype=torch.float32))
+            loss = binary_cross_entropy(y_out, label.to(dtype=torch.float32))
             loss.backward()
             optim.step()
             step += 1
@@ -237,7 +236,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
                 y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
                 label = validate_label_dataset[indices].reshape(y_out.shape)
-                loss = loss_fn(y_out, label.to(dtype=torch.float32))
+                loss = binary_cross_entropy(y_out, label.to(dtype=torch.float32))
                 losses.append(loss.item())
 
             loss_mean = sum(losses) / len(losses)

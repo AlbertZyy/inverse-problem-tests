@@ -1,7 +1,7 @@
 
 data:
-  s:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_single-tag-s.csv'
+  $\gamma$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_single-tag-s.csv'
     marker: ''
     linestyle: '-'
     color: 'blue'
@@ -12,10 +12,10 @@ xlog: False
 
 fig_name: 's evo'
 fig_size: [12, 9]
-title: 'Evolution of scalar s (no noise)'
+title: 'Evolution of single $\gamma$ (no noise)'
 
-xlabel: 'iteration'
-ylabel: 'fractional order s'
+xlabel: 'Iteration'
+ylabel: '$\gamma$'
 
 xlim: 'auto'
 ylim: [0.0, 0.7]
@@ -25,4 +25,4 @@ index: 'None'
 slice: [0, 1000, 1]
 
 show: True
-save: './test_no_noise/figures/s_evo_nn_single.png'
+save: './old/test_no_noise/figures/s_evo_nn_single.png'

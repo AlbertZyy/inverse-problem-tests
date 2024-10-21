@@ -1,34 +1,34 @@
 
 data:
-  s = 0:
-    csv_file: '.\test_no_noise\plot_data\run-u100_nn_sng-tag-loss(validate).csv'
+  $\gamma = 0$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_sng-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'k'
 
   Single:
-    csv_file: '.\test_no_noise\plot_data\run-u100_nn_single-tag-loss(validate).csv'
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_single-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'r'
 
   Multi:
-    csv_file: '.\test_no_noise\plot_data\run-u100_nn_multi-tag-loss(validate).csv'
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-loss(validate).csv'
     marker: ''
     linestyle: '-'
     linewidth: 1
     color: 'g'
 
-rectangle:
-  xy: [1000, 0.03]
-  width: 38500
-  height: 0.07
-  fill: False
-  color: 'k'
-  linestyle: '--'
-  linewidth: 2
+# rectangle:
+#   xy: [1000, 0.03]
+#   width: 38500
+#   height: 0.07
+#   fill: False
+#   color: 'k'
+#   linestyle: '--'
+#   linewidth: 2
 
 smooth: 0.8
 xlog: True
@@ -41,13 +41,14 @@ title: 'Validation loss (no noise)'
 xlabel: 'iteration'
 ylabel: 'loss'
 
-# xlim: [1000, 35000]
-# ylim: [0.03, 0.1]
-# ytick_num: 8
-xlim: 'auto'
-ylim: 'auto'
+xlim: [1000, 35000]
+ylim: [0.03, 0.1]
+ytick_num: 8
+# xlim: 'auto'
+# ylim: 'auto'
 
 slice: [1, 1000, 1]
 
 show: True
-save: '.\test_no_noise\figures\validation_loss_evo_nn_full.png'
+# save: './old/test_no_noise/figures/validation_loss_evo_nn_full.png'
+save: './old/test_no_noise/figures/validation_loss_evo_nn_zoomin.png'

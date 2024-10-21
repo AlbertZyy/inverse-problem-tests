@@ -1,62 +1,70 @@
 
 data:
-  s0:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s0.csv'
+  $\gamma_1$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s0.csv'
     marker: ''
     linestyle: '-'
     color: 'red'
+    linewidth: 1.00
 
-  s1:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s1.csv'
+  $\gamma_2$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s1.csv'
     marker: ''
     linestyle: '-'
     color: 'orange'
+    linewidth: 1.00
 
-  s2:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s2.csv'
+  $\gamma_3$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s2.csv'
     marker: ''
     linestyle: '-'
     color: 'y'
+    linewidth: 1.00
 
-  s3:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s3.csv'
+  $\gamma_4$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s3.csv'
     marker: ''
     linestyle: '-'
     color: 'green'
+    linewidth: 1.00
 
-  s4:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s4.csv'
+  $\gamma_5$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s4.csv'
     marker: ''
     linestyle: '-'
     color: 'darkcyan'
+    linewidth: 1.00
 
-  s5:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s5.csv'
+  $\gamma_6$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s5.csv'
     marker: ''
     linestyle: '-'
     color: 'blue'
+    linewidth: 1.00
 
-  s6:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s6.csv'
+  $\gamma_7$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s6.csv'
     marker: ''
     linestyle: '-'
     color: 'purple'
+    linewidth: 1.00
 
-  s7:
-    csv_file: './test_no_noise/plot_data/run-u100_nn_multi-tag-s7.csv'
+  $\gamma_8$:
+    csv_file: './old/test_no_noise/plot_data/run-u100_nn_multi-tag-s7.csv'
     marker: ''
     linestyle: '-'
     color: 'black'
+    linewidth: 1.00
 
 
 smooth: 0.0
 
 fig_name: 's evo'
 fig_size: [12, 9]
-title: 'Evolution of multi-valued s (no noise)'
+title: 'Evolution of multi-valued $\gamma$ (no noise)'
 
-xlabel: 'iteration'
-ylabel: 'fractional-order s'
+xlabel: 'Iteration'
+ylabel: '$\gamma$'
 
 xlim: 'auto'
 ylim: [-0.1, 0.7]
@@ -66,4 +74,4 @@ index: 'None'
 slice: [0, 1000, 1]
 
 show: True
-save: './test_no_noise/figures/s_evo_nn.png'
+save: './old/test_no_noise/figures/s_evo_nn.png'

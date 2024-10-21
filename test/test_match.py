@@ -8,36 +8,37 @@ import torch
 from torch.utils.data import RandomSampler, BatchSampler
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
-from fealpy.torch.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
-from fem import EITDataPreprocessor, DataFeatureFEMSolver, LaplaceFEMSolver
+from lafemeit.model import DataPreprocessor, DataFeature
+from lafemeit.solver import LaplaceFEMSolver
 from fdm import LaplaceFDMSolver
 from data_feature import MultiChannelDataFeature
 from dataset import NPYDataset, NPZDataset
 
 
-fem_dataset = NPYDataset('data/cir3_e64_64_c8_test/gd', names=[str(i) for i in range(50)])
-fem_gn = torch.from_numpy(np.load('data/cir3_e64_64_c8_test/gn.npy'))
+fem_dataset = NPYDataset('lafem/data/cir3_e64_64_c8/gd', names=[str(i) for i in range(5000)])
+fem_gn = torch.from_numpy(np.load('lafem/data/cir3_e64_64_c8/gn.npy'))
 
 fdm_dataset = NPZDataset('data/cir3_e64_64_c8_old_test',
                          names=[str(i) for i in range(50)],
                          channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'])
 
-INEDX = 33
-CH = 0
+INDEX = 2333
+CH = 1
 
 mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=63, ny=63)
 fem_solver = LaplaceFEMSolver(mesh, p=1, q=4)
-fem_dfprepro = EITDataPreprocessor(fem_solver)
-fem_dfsolver = DataFeatureFEMSolver(fem_solver)
+fem_dfprepro = DataPreprocessor(fem_solver)
+fem_dfsolver = DataFeature(fem_solver)
 
-# fem_data = fem_dataset[INEDX]
-# fem_data = torch.stack([fem_data, fem_gn], dim=-2).unsqueeze(0)
+fem_data = fem_dataset[INDEX]
+fem_data = torch.stack([fem_data, fem_gn], dim=-2).unsqueeze(0)
 # NOTE: 两个数据集的 gn 基本就相差一个网格的 h。
 # 用以下的 fdm 数据 *h 测试 fem 模型，能得出 fem 数据下几乎一样的结果。
-fem_data, _ = fdm_dataset[INEDX]
-fem_data = fem_data.unsqueeze(0)
-fem_data[:, :, 1, :] = fem_data[:, :, 1, :] * 2./63
+# fem_data, _ = fdm_dataset[INDEX]
+# fem_data = fem_data.unsqueeze(0)
+# fem_data[:, :, 1, :] = fem_data[:, :, 1, :] * 2./63
 
 fem_phi = fem_dfprepro(fem_data)
 fem_phi = fem_dfsolver(fem_phi)
@@ -51,8 +52,10 @@ if not input('continue?') == 'y':
 fdm_solver = LaplaceFDMSolver([63, 63], [2/63, 2/63])
 fdm_dfsolver = MultiChannelDataFeature(fdm_solver)
 
-fdm_data, _ = fdm_dataset[INEDX]
-fdm_data = fdm_data.unsqueeze(0)
+fdm_data = fem_dataset[INDEX]
+fdm_data = torch.stack([fdm_data, fem_gn * 63/2.], dim=-2).unsqueeze(0)
+# fdm_data, _ = fdm_dataset[INDEX]
+# fdm_data = fdm_data.unsqueeze(0)
 fdm_phi = fdm_dfsolver(fdm_data).squeeze_(0)
 fdm_phi = fdm_phi.reshape(8, 64, 64)
 
@@ -90,25 +93,25 @@ qm = axes.pcolormesh(X, Y, diff[CH, :, :], cmap='inferno')
 fig.colorbar(qm, ax=axes)
 axes.set_title('diff.abs')
 
-# AXES 2 FEM
+# AXES 2 (FEM)
 axes = fig.add_subplot(1, 3, 2)
 qm = axes.pcolormesh(X, Y, fem_phi[CH, :, :], cmap='jet')
 fig.colorbar(qm, ax=axes)
-axes.set_title('fem')
+axes.set_title('FEM')
 
-file_ = np.load(f'data/cir3_e64_64_c8_test/inclusion/{INEDX}.npz')
+file_ = np.load(f'lafem/data/cir3_e64_64_c8/inclusion/{INDEX}.npz')
 ctrs, rads = file_['ctrs'], file_['rads']
 for j in range(ctrs.shape[0]):
     circle = Circle((ctrs[j, 0], ctrs[j, 1]), rads[j], color='white', fill=False, linewidth=1.5, linestyle='--')
     axes.add_patch(circle)
 
-# AXES 3 FDM
+# AXES 3 (FDM)
 axes = fig.add_subplot(1, 3, 3)
 qm = axes.pcolormesh(X, Y, fdm_phi[CH, :, :], cmap='jet')
 fig.colorbar(qm, ax=axes)
-axes.set_title('fdm')
+axes.set_title('FDM')
 
-file_ = np.load(f'data/cir3_e64_64_c8_old_test/{INEDX}.npz')
+file_ = np.load(f'lafem/data/cir3_e64_64_c8/inclusion/{INDEX}.npz')
 ctrs, rads = file_['ctrs'], file_['rads']
 for j in range(ctrs.shape[0]):
     circle = Circle((ctrs[j, 0], ctrs[j, 1]), rads[j], color='white', fill=False, linewidth=1.5, linestyle='--')

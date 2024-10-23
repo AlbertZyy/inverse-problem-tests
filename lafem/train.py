@@ -12,11 +12,12 @@ from torch.optim import SGD
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import RandomSampler, BatchSampler
 from torch.nn.functional import binary_cross_entropy
-from kokomi import Arrange
+# from kokomi import Arrange
 from tqdm import tqdm, trange
 
 from lafemeit.model import build_eit_model, Fractional
 from lafemeit.utils import NPYDataset, NPZDataset, MemoryDataset
+from bce_loss import DropedBCELoss
 
 
 ### parse args
@@ -49,9 +50,9 @@ momentum        = config.get('momentum', 0)
 weight_decay    = config.get('weight_decay', 0.0)
 
 
-works = Arrange()
-works.import_yaml(args.config)
-print(works._pool_size)
+# works = Arrange()
+# works.import_yaml(args.config)
+# print(works._pool_size)
 
 print("Train(SGD) setup:")
 print(f"  - learning rate: {lr}")
@@ -59,7 +60,7 @@ print(f"  - momentum: {momentum}")
 print(f"  - weight decay: {weight_decay}", end='\n\n')
 
 
-def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
+def main(noise: float, use_noise_filter: bool, tag: str, type_: str, gpu_id: int, **kwargs):
     device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
     data_conf = config['data']
 
@@ -161,6 +162,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
     ### train
 
+    loss_func = DropedBCELoss((64*64,), dtype=torch.float32, device=device)
     optim = SGD(model.parameters(), lr=lr,
                 momentum=momentum, weight_decay=weight_decay)
     writer_1 = SummaryWriter(os.path.join(log_dir, MODEL_NAME), flush_secs=30)
@@ -174,6 +176,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
                         colour=COLOR.get(gpu_id, 'white')):
         ### train
         model.train()
+        loss_func.train()
         step = 0
         sampler = RandomSampler(train_data_dataset)
         batch_sampler = BatchSampler(sampler, batch_size=data_conf['train_batch_size'], drop_last=False)
@@ -194,7 +197,8 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
             y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
             label = train_label_dataset[indices].reshape(y_out.shape)
-            loss = binary_cross_entropy(y_out, label.to(dtype=torch.float32))
+            # loss = binary_cross_entropy(y_out, label.to(dtype=torch.float32))
+            loss = loss_func(y_out, label.to(dtype=torch.float32))
             loss.backward()
             optim.step()
             step += 1
@@ -216,6 +220,7 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
         ### validate
         model.eval()
+        loss_func.eval()
         sampler = RandomSampler(validate_data_dataset)
         batch_sampler = BatchSampler(sampler, batch_size=data_conf['validate_batch_size'], drop_last=False)
         losses = []
@@ -247,4 +252,5 @@ def main(noise, use_noise_filter, tag, type_, gpu_id, **kwargs):
 
 
 if __name__ == '__main__':
-    works.run(main)
+    # works.run(main)
+    main(noise=0.0, use_noise_filter=False, tag='nn_multi', type_='multi', gpu_id=0)

@@ -20,10 +20,10 @@ L_FACTOR = 8.4
 ENABLE_FILTER = True
 
 frac = Fractional(252)
-frac.from_npz(r'data\laplace_beltrami_63_63.npz')
+frac.from_npz(r'lafem/data/laplace_beltrami_63_63.npz')
 frac.initialize(-0.75)
 
-dataset = NPZDataset(r'data\gdgn_cir3_e64_64_c8_validate', names=10,
+dataset = NPZDataset(r'lafem/data/gdgn_cir3_e64_64_c8_validate', names=10,
                      channel_keys=['1', '2', '3', '4', '5', '6', '8', '16'])
 data = dataset[0][0]
 torch.random.manual_seed(2024)

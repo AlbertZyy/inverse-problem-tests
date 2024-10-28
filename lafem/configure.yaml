@@ -1,11 +1,11 @@
 
 data:
-  train_set_location: "data/cir3_e64_64_c8/"
+  train_set_location: "lafem/data/cir3_e64_64_c8/"
   train_set_start: 0
   train_set_end: 900
   train_batch_size: 10
 
-  validate_set_location: "data/cir3_e64_64_c8/"
+  validate_set_location: "lafem/data/cir3_e64_64_c8/"
   validate_set_start: 900
   validate_set_end: 1000
   validate_batch_size: 10

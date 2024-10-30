@@ -1,3 +1,4 @@
+from time import time
 
 from fealpy.backend import backend_manager as bm
 from fealpy.pde.poisson_3d import BatchedCosCosCosData
@@ -9,78 +10,60 @@ from fealpy.fem import (
     ScalarSourceIntegrator,
     ScalarNeumannBCIntegrator
 )
+from fealpy.sparse import COOTensor
 from fealpy.solver import cg
 from fealpy.utils import timer
-from fealpy import logger
 
-logger.setLevel('INFO')
 bm.set_backend('pytorch')
 tmr = timer()
 
 if bm.backend_name == 'pytorch':
-    bm.set_default_device('cuda:4')
+    bm.set_default_device('cuda:7')
 
-for _ in range(2):
+total_time = 0.
+LOOPS = 10
+EXT = 64
+P = 2
 
-    next(tmr)
+for i in range(LOOPS + 1):
+    t0 = time()
     OMEGA = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     pde = BatchedCosCosCosData(omega=OMEGA, dtype=bm.float64)
-    mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=32, ny=32, nz=32)
-    space = LagrangeFESpace(mesh, p=1)
+    mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=EXT, ny=EXT, nz=EXT)
+    space = LagrangeFESpace(mesh, p=P)
+    GDOF = space.number_of_global_dofs()
 
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
-    A = bform.assembly()
+    A = bform.assembly(format='coo')
 
-    lform = LinearForm(space, batch_size=len(OMEGA))
+    lform_c = LinearForm(space)
+    lform_c.add_integrator(ScalarNeumannBCIntegrator(1.))
+    c = lform_c.assembly(format='coo')
+
+    new_value = bm.concat([A.values(), c.values(), c.values()], axis=0)
+    c_idx = bm.concat([c.indices(), bm.full_like(c.indices(), GDOF)], axis=0)
+    new_indices = bm.concat(
+        [A.indices(), c_idx, bm.flip(c_idx, axis=0)], axis=-1
+    )
+    A = COOTensor(new_indices, new_value, spshape=(GDOF+1, GDOF+1)).tocsr()
+
     lform.add_integrator(ScalarSourceIntegrator(pde.source, batched=True))
     lform.add_integrator(ScalarNeumannBCIntegrator(pde.neumann, batched=True))
     F = lform.assembly()
+    ZERO = bm.zeros((len(OMEGA), 1), dtype=F.dtype, device=F.device)
+    F = bm.concat([F, ZERO], axis=-1)
 
-    uh = cg(A, F, batch_first=True, atol=1e-12, rtol=0.0)
+    lform = LinearForm(space, batch_size=len(OMEGA))
+    uh = cg(A, F, batch_first=True, atol=1e-12, rtol=0.0)[:, :-1]
+    t1 = time()
 
-    tmr.send('solve')
+    if i > 1:
+        total_time += t1 - t0
 
-next(tmr)
+print(total_time / LOOPS)
 
-# 64*64*64, p=1
-"""
-[10-28 13:45:34][INFO] fealpy: Mesh toplogy relation constructed, with 1572864 cells, 3170304 faces, 274625 nodes on device ?
-[10-28 13:45:34][INFO] fealpy: Bilinear form matrix constructed, with shape [274625, 274625].
-[10-28 13:45:34][INFO] fealpy: Linear form vector constructed, with shape [10, 274625].
-[10-28 13:45:35][INFO] fealpy: CG: converged in 340 iterations, stopped by absolute tolerance.
-Timer received None and paused.
-=================================================
-   ID       Time        Proportion(%)    Label
--------------------------------------------------
-    1      1.599 [s]          100.000    solve
-=================================================
-"""
 
-### 64*64*64, p=2
-"""
-[10-28 13:48:42][INFO] fealpy: Mesh toplogy relation constructed, with 1572864 cells, 3170304 faces, 274625 nodes on device ?
-[10-28 13:48:43][INFO] fealpy: Bilinear form matrix constructed, with shape [2146689, 2146689].
-[10-28 13:48:43][INFO] fealpy: Linear form vector constructed, with shape [10, 2146689].
-[10-28 13:48:51][INFO] fealpy: CG: converged in 623 iterations, stopped by absolute tolerance.
-Timer received None and paused.
-=================================================
-   ID       Time        Proportion(%)    Label
--------------------------------------------------
-    1      8.895 [s]          100.000    solve
-=================================================
-"""
-
-### 32*32*32, p=1
-"""
-[10-28 13:53:26][INFO] fealpy: Mesh toplogy relation constructed, with 196608 cells, 399360 faces, 35937 nodes on device ?
-[10-28 13:53:26][INFO] fealpy: Bilinear form matrix constructed, with shape [35937, 35937].
-[10-28 13:53:26][INFO] fealpy: Linear form vector constructed, with shape [10, 35937].
-[10-28 13:53:26][INFO] fealpy: CG: converged in 188 iterations, stopped by absolute tolerance.
-Timer received None and paused.
-=================================================
-   ID       Time        Proportion(%)    Label
--------------------------------------------------
-    1    145.584 [ms]         100.000    solve
-=================================================
-"""
+# 32*32*32, p=1, 0.15490543842315674
+# 64*64*64, p=1, 0.5942094564437866
+# 64*64*64, p=2, 7.711729693412781

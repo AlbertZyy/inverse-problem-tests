@@ -47,16 +47,16 @@ titles = [
     (3, 0, 'Multi',           90)
 ]
 
-LABEL_POS = (1, 4)
+LABEL_POS = (4, 1)
 
-figure_matrix = [4, 5]
-wr = [0.15, 1, 1, 1, 1]
-hr = [0.15, 1, 1, 1]
-figure_size = (16, 12)
+figure_matrix = [5, 4]
+wr = [0.15, 1, 1, 1]
+hr = [0.15, 1, 1, 1, 1]
+figure_size = (12, 16)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
-gd_set = NPYDataset("lafem/data/cir5_e64_64_c8/gd", [str(i) for i in range(200)])
-gn = torch.from_numpy(np.load('lafem/data/cir5_e64_64_c8/gn.npy')).to(device)
-label_set = NPZDataset("lafem/data/cir5_e64_64_c8/inclusion", [str(i) for i in range(200)])
+gd_set = NPYDataset("lafem/data/cir5_e64_64_c8_modified/gd", [str(i) for i in range(12000)])
+gn = torch.from_numpy(np.load('lafem/data/cir5_e64_64_c8_modified/gn.npy')).to(device)
+label_set = NPZDataset("lafem/data/cir5_e64_64_c8_modified/inclusion", [str(i) for i in range(12000)])
 
 
 save_dir = 'lafem/figure/'
@@ -65,7 +65,7 @@ os.makedirs(save_dir, exist_ok=True)
 
 ### Validation and Visualization Scripts ###
 
-ID = list(range(100, 120))
+ID = [105,]
 figs = {i: plt.figure(f"Data{i}", figsize=figure_size) for i in ID}
 gs = GridSpec(figure_matrix[0], figure_matrix[1],
               width_ratios=wr, height_ratios=hr)
@@ -108,7 +108,7 @@ for pos_row, pos_col, tag, type_, noise_coef, noise_filter, ckpts_path in settin
         axes = fig.add_subplot(gs[pos_row, pos_col])
         axes.pcolormesh(X, Y, pred.detach().cpu().reshape(64, 64), cmap='jet', vmin=0, vmax=1)
 
-        file_ = np.load(f'lafem/data/cir5_e64_64_c8/inclusion/{i}.npz')
+        file_ = np.load(f'lafem/data/cir5_e64_64_c8_modified/inclusion/{i}.npz')
         ctrs, rads = file_['ctrs'], file_['rads']
 
         for j in range(ctrs.shape[0]):
@@ -130,4 +130,4 @@ for i in ID:
         axes.set_title('Inclusion')
 
     figs[i].tight_layout()
-    figs[i].savefig(os.path.join(save_dir, f'vis_cir5_{i}_lowfreq.png'))
+    figs[i].savefig(os.path.join(save_dir, f'vis_cir5_{i}_lowfreq_m.png'))

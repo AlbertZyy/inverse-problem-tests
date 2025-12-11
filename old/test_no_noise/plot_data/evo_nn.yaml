@@ -21,14 +21,14 @@ data:
     linewidth: 1
     color: 'g'
 
-# rectangle:
-#   xy: [1000, 0.03]
-#   width: 38500
-#   height: 0.07
-#   fill: False
-#   color: 'k'
-#   linestyle: '--'
-#   linewidth: 2
+rectangle:
+  xy: [1000, 0.03]
+  width: 38500
+  height: 0.07
+  fill: False
+  color: 'k'
+  linestyle: '--'
+  linewidth: 2
 
 smooth: 0.8
 xlog: True
@@ -36,19 +36,19 @@ ylog: True
 
 fig_name: 'loss'
 fig_size: [8, 6]
-title: 'Validation loss (no noise)'
+title: 'Validation Loss'
 
-xlabel: 'iteration'
-ylabel: 'loss'
+xlabel: 'Iteration'
+ylabel: 'Loss'
 
-xlim: [1000, 35000]
-ylim: [0.03, 0.1]
-ytick_num: 8
-# xlim: 'auto'
-# ylim: 'auto'
+# xlim: [1000, 35000]
+# ylim: [0.03, 0.1]
+# ytick_num: 8
+xlim: 'auto'
+ylim: 'auto'
 
 slice: [1, 1000, 1]
 
 show: True
-# save: './old/test_no_noise/figures/validation_loss_evo_nn_full.png'
-save: './old/test_no_noise/figures/validation_loss_evo_nn_zoomin.png'
+save: './old/test_no_noise/figures/validation_loss_evo_nn_full.png'
+# save: './old/test_no_noise/figures/validation_loss_evo_nn_zoomin.png'

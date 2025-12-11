@@ -69,6 +69,9 @@ for legend, data in config['data'].items():
 
     axes.plot(step, value, label=legend, **data)
 
+    if config.get('show_terminal', False):
+        axes.text(step[-1], value[-1], f'{value[-1]:.3f}', color='black', fontsize=16)
+
 if config.get('xlog', False) is True:  # xlog
     axes.set_xscale('log')
 if config.get('ylog', False) is True:

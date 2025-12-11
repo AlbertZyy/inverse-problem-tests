@@ -37,7 +37,7 @@ ylog: False
 
 fig_name: 'loss'
 fig_size: [9, 6]
-title: 'Validation loss (Low-freq noise)'
+title: 'Validation loss'
 
 xlabel: 'noise ratio'
 ylabel: 'loss'

@@ -61,10 +61,11 @@ smooth: 0.0
 
 fig_name: 's evo'
 fig_size: [12, 9]
-title: 'Evolution of multi-valued $\gamma$ (no noise)'
+title: 'Evolution of multi-valued $\gamma$'
 
 xlabel: 'Iteration'
 ylabel: '$\gamma$'
+show_terminal: True
 
 xlim: 'auto'
 ylim: [-0.1, 0.7]

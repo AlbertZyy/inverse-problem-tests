@@ -12,10 +12,11 @@ xlog: False
 
 fig_name: 's evo'
 fig_size: [12, 9]
-title: 'Evolution of single $\gamma$ (no noise)'
+title: 'Evolution of single $\gamma$'
 
 xlabel: 'Iteration'
 ylabel: '$\gamma$'
+show_terminal: True
 
 xlim: 'auto'
 ylim: [0.0, 0.7]

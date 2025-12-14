@@ -1,0 +1,54 @@
+workspace:
+  ckpts_folder: 'ckpts'
+  logs_folder: 'logs'
+  epoch_prefix: 'e'
+  ckpts_extension: '.pt'
+  step_key: 'step'
+
+base:
+  data.noise: 0.01
+  data.gn_path: data/
+  data.gd_path: data/
+  data.grid_size: [64, 64]
+  data.area: 4.0
+  data.perimeter: 8.0
+  u.sigma:
+    - tanh
+    - tanh
+    - sinc
+    - softplus
+    - sinc
+    - softplus
+    - sinc
+    - softplus
+    - none
+  u.dims: [20, 20, 20, 20, 20, 20, 20, 20, 1]
+  gamma.sigma:
+    - tanh
+    - tanh
+    - elu
+    - tanh
+    - elu
+    - tanh
+    - sigmoid
+    - sigmoid
+    - elu
+  gamma.dims: [20, 20, 20, 20, 20, 20, 20, 20, 1]
+  phi.sigma:
+    - tanh
+    - tanh
+    - sinc
+    - sinc
+    - sinc
+    - sinc
+    - sinc
+    - sinc
+    - none
+  phi.dims: [20, 20, 20, 20, 20, 20, 20, 20, 1]
+  sgd1.lr: 0.010
+  sgd1.weight_decay: 0.0000001
+  sgd2.lr: 0.008
+  sgd2.weight_decay: 0.0000001
+  optim.jn: 2
+  beta: 10000
+  epochs: 20000

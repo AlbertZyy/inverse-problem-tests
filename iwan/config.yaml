@@ -7,8 +7,10 @@ workspace:
 
 base:
   data.noise: 0.01
-  data.gn_path: data/
-  data.gd_path: data/
+  data.bdry_info_path: data/boundary_info_64x64.npz
+  data.gn_path: data/cir3_e64_64_c8/gn.npy
+  data.gd_path: data/cir3_e64_64_c8/gd/10653.npy
+  data.label_path: data/cir3_e64_64_c8/inclusion/10653.npz
   data.grid_size: [64, 64]
   data.area: 4.0
   data.perimeter: 8.0
@@ -50,5 +52,36 @@ base:
   sgd2.lr: 0.008
   sgd2.weight_decay: 0.0000001
   optim.jn: 2
-  beta: 10000
+  loss.coef_A: 1.0
+  loss.coef_AG: 1.0
+  loss.coef_B1: 1.0
+  loss.coef_B2: 0.01
+  loss.coef_B3: 1.0
+  phi_constraint: 100
   epochs: 20000
+
+
+base/test1:
+  loss.coef_A: 0.01
+  loss.coef_AG: 0.01
+
+
+base/test2:
+  sgd1.lr: 0.0010
+  sgd2.lr: 0.0008
+
+
+base/test3:
+  sgd1.lr: 0.010000
+  sgd2.lr: 0.000001
+  loss.coef_A: 0.0001
+  loss.coef_AG: 0.0001
+
+
+base/test4:
+  data.gd_path: data/cir3_e64_64_c8/gd/0.npy
+  data.label_path: data/cir3_e64_64_c8/inclusion/0.npz
+  sgd1.lr: 0.01000
+  sgd2.lr: 0.00001
+  loss.coef_A: 0.0001
+  loss.coef_AG: 0.0001

@@ -6,12 +6,12 @@ workspace:
   step_key: 'step'
 
 base:
-  data.noise: 0.01
+  data.noise: 0.0
   data.bdry_info_path: data/boundary_info_64x64.npz
-  data.gn_path: data/cir3_e64_64_c8/gn.npy
-  data.gd_path: data/cir3_e64_64_c8/gd/10653.npy
-  data.label_path: data/cir3_e64_64_c8/inclusion/10653.npz
-  data.grid_size: [64, 64]
+  data.gn_path: data/cir3_64x64_c8/gn.npy
+  data.gd_path: data/cir3_64x64_c8/gd/10653.npy
+  data.label_path: data/cir3_64x64_c8/inclusion/10653.npz
+  data.num_samples: 20480
   data.area: 4.0
   data.perimeter: 8.0
   u.sigma:
@@ -52,36 +52,68 @@ base:
   sgd2.lr: 0.008
   sgd2.weight_decay: 0.0000001
   optim.jn: 2
-  loss.coef_A: 1.0
-  loss.coef_AG: 1.0
+  loss.coef_A: 0.0001
+  loss.coef_AG: 0.001
+  loss.coef_AP: 0.001
   loss.coef_B1: 1.0
-  loss.coef_B2: 0.01
+  loss.coef_B2: 1.0
   loss.coef_B3: 1.0
-  phi_constraint: 100
+  loss.coef_BP: 1.0
+  phi_constraint: 200
   epochs: 20000
 
 
-base/test1:
-  loss.coef_A: 0.01
-  loss.coef_AG: 0.01
-
-
-base/test2:
-  sgd1.lr: 0.0010
-  sgd2.lr: 0.0008
-
-
-base/test3:
-  sgd1.lr: 0.010000
-  sgd2.lr: 0.000001
+simple:
+  data.noise: 0.0
+  data.bdry_info_path: data/boundary_info_64x64.npz
+  data.gn_path: data/cir3_64x64_c8/gn.npy
+  data.gd_path: data/cir3_64x64_c8/gd/10653.npy
+  data.label_path: data/cir3_64x64_c8/inclusion/10653.npz
+  data.num_samples: 20480
+  data.area: 4.0
+  data.perimeter: 8.0
+  u.sigma:
+    - tanh
+    - tanh
+    - sinc
+    - softplus
+    - none
+  u.dims: [128, 64, 32, 16, 1]
+  gamma.sigma:
+    - tanh
+    - tanh
+    - elu
+    - tanh
+    - elu
+  gamma.dims: [128, 64, 32, 16, 1]
+  phi.sigma:
+    - tanh
+    - tanh
+    - sinc
+    - sinc
+    - none
+  phi.dims: [128, 64, 32, 16, 1]
+  sgd1.lr: 0.010
+  sgd1.weight_decay: 0.0000001
+  sgd2.lr: 0.008
+  sgd2.weight_decay: 0.0000001
+  optim.jn: 2
   loss.coef_A: 0.0001
-  loss.coef_AG: 0.0001
+  loss.coef_AG: 0.001
+  loss.coef_AP: 0.001
+  loss.coef_B1: 1.0
+  loss.coef_B2: 1.0
+  loss.coef_B3: 1.0
+  loss.coef_BP: 1.0
+  phi_constraint: 200
+  epochs: 20000
 
 
-base/test4:
-  data.gd_path: data/cir3_e64_64_c8/gd/0.npy
-  data.label_path: data/cir3_e64_64_c8/inclusion/0.npz
-  sgd1.lr: 0.01000
-  sgd2.lr: 0.00001
-  loss.coef_A: 0.0001
-  loss.coef_AG: 0.0001
+simple/test1:
+  loss.coef_AP: 0.01
+
+
+simple/wide1:
+  u.dims: [256, 128, 64, 32, 1]
+  gamma.dims: [256, 128, 64, 32, 1]
+  phi.dims: [256, 128, 64, 32, 1]

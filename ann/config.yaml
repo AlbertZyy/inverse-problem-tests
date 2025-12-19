@@ -1,0 +1,21 @@
+
+
+base:
+  data.gd_folder: data/cir3_64x64_c8/gd
+  data.inclusion_folder: data/cir3_64x64_c8/inclusion
+  data.train_set_start: 0
+  data.train_set_end: 7154
+  data.valid_set_start: 7154
+  data.valid_set_end: 8687
+
+  model.input_dims: 2016 # = 252 * 8
+  model.hidden_dims: [150, 150, 150, 150]
+  model.output_dims: 4096
+
+  optim.lr: 0.001
+  optim.weight_decay: 0.0000001
+
+  scheduler.warmup_steps: 1000
+
+  train.epochs: 1000
+  train.batch_size: 128

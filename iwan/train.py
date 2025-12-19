@@ -96,7 +96,7 @@ def norm_B2(inputs: Tensor, normal: Tensor, bdry_edge: Tensor, u_net, gub, gamma
     inner = torch.einsum("nd, nd -> n", grad_u, normal) # (NE,)
     val = torch.zeros(NN, **CONTEXT).requires_grad_() # (NN,)
     for i in range(2):
-        val = val.index_add(0, index=bdry_edge[:, i], source=inner)
+        val = val.index_add(0, index=bdry_edge[:, i], source=inner/2)
     return F.mse_loss(val[:, None]*gammab, gub) * perimeter
 
 def norm_B3(inputs: Tensor, gamma_net, gammab, perimeter: float):
@@ -114,15 +114,15 @@ def main(case: str):
     GD = 2
     ssc = sucrose.scenario("iwan", case)
 
-    u_net = ssc.partial(DenseNet, "u.")(input_dim=GD)
-    gamma_net = ssc.partial(DenseNet, "gamma.")(input_dim=GD)
-    phi1_net = ssc.partial(DenseNet, "phi.")(input_dim=GD)
-    phi2_net = ssc.partial(DenseNet, "phi.")(input_dim=GD)
+    u_net = ssc.partial(DenseNet, "u.")(input_dim=GD).to(DEVICE)
+    gamma_net = ssc.partial(DenseNet, "gamma.")(input_dim=GD).to(DEVICE)
+    phi1_net = ssc.partial(DenseNet, "phi.")(input_dim=GD).to(DEVICE)
+    phi2_net = ssc.partial(DenseNet, "phi.")(input_dim=GD).to(DEVICE)
 
     sgd_u = ssc.partial(SGD, "sgd1")(u_net.parameters())
     sgd_gamma = ssc.partial(SGD, "sgd1")(gamma_net.parameters())
-    sgd_phi1 = ssc.partial(SGD, "sgd2")(phi1_net.parameters(), maximize=True)
-    sgd_phi2 = ssc.partial(SGD, "sgd2")(phi2_net.parameters(), maximize=True)
+    sgd_phi1 = ssc.partial(SGD, "sgd2")(phi1_net.parameters())
+    sgd_phi2 = ssc.partial(SGD, "sgd2")(phi2_net.parameters())
 
     writter = ssc.start_pytorch_tensorboard()
 
@@ -145,12 +145,15 @@ def main(case: str):
     label = label.to(**CONTEXT) * 9 + 1.0
     gammab = 1.0
 
+    NN = ssc["data.num_samples"]
     Jn = ssc["optim.jn"]
     COEF_A = ssc["loss.coef_A"]
     COEF_AG = ssc["loss.coef_AG"]
+    COEF_AP = ssc["loss.coef_AP"]
     COEF_B1 = ssc["loss.coef_B1"]
     COEF_B2 = ssc["loss.coef_B2"]
     COEF_B3 = ssc["loss.coef_B3"]
+    COEF_BP = ssc["loss.coef_BP"]
     AREA = ssc["data.area"]
     PERIMETER = ssc["data.perimeter"]
     B = ssc["phi_constraint"]
@@ -164,10 +167,11 @@ def main(case: str):
         sgd_gamma = sgd_gamma,
         sgd_phi1 = sgd_phi1,
         sgd_phi2 = sgd_phi2,
+        loader_kwds={"map_location": DEVICE}
     )
 
     for epoch in ssc.epoch_range(ssc["epochs"]):
-        random_node = torch.rand_like(node) * 2 - 1.
+        random_node = torch.rand([NN, 2], **CONTEXT) * 2 - 1.
         random_node.requires_grad_()
         # update u
         normA = norm_A(random_node, u_net, gamma_net, [phi1_net, phi2_net], AREA)
@@ -182,8 +186,10 @@ def main(case: str):
         # update phi1
         for _ in range(Jn):
             normA = norm_A(random_node, u_net, gamma_net, [phi1_net, phi2_net], AREA)
+            normBPhi1 = norm_B3(bdry_node, phi1_net, 0., PERIMETER)
+            loss = -COEF_AP * normA + COEF_BP * normBPhi1
             zero_grad([sgd_u, sgd_gamma, sgd_phi1, sgd_phi2])
-            normA.backward(retain_graph=True)
+            loss.backward(retain_graph=True)
             sgd_phi1.step()
 
         # update gamma
@@ -197,8 +203,10 @@ def main(case: str):
         # update phi2
         for _ in range(Jn):
             normA = norm_A(random_node, u_net, gamma_net, [phi1_net, phi2_net], AREA)
+            normBPhi2 = norm_B3(bdry_node, phi2_net, 0., PERIMETER)
+            loss = -COEF_AP * normA + COEF_BP * normBPhi2
             zero_grad([sgd_u, sgd_gamma, sgd_phi1, sgd_phi2])
-            normA.backward(retain_graph=True)
+            loss.backward(retain_graph=True)
             sgd_phi2.step()
 
         with torch.no_grad():
@@ -207,16 +215,18 @@ def main(case: str):
                 for param in phi_net.parameters():
                     param.clamp_(-upper, upper)
 
-        writter.add_scalar("normA(train)", normA.item(), ssc.num_steps)
-        writter.add_scalar("normB1(train)", normB1.item(), ssc.num_steps)
-        writter.add_scalar("normB2(train)", normB2.item(), ssc.num_steps)
-        writter.add_scalar("normB3(train)", normB3.item(), ssc.num_steps)
-        # writter.add_scalar("loss(train)", loss.item(), ssc.num_steps)
+        writter.add_scalar("normA", normA.item(), ssc.num_steps)
+        writter.add_scalar("normB1", normB1.item(), ssc.num_steps)
+        writter.add_scalar("normB2", normB2.item(), ssc.num_steps)
+        writter.add_scalar("normB3", normB3.item(), ssc.num_steps)
+        writter.add_scalar("normBPhi1", normBPhi1.item(), ssc.num_steps)
+        writter.add_scalar("normBPhi2", normBPhi2.item(), ssc.num_steps)
+        # writter.add_scalar("loss", loss.item(), ssc.num_steps)
         if ssc.num_steps % 200 == 0:
             img = gamma_net(node).reshape(1, 64, 64)
             # color map
             img = (img - img.min()) / (img.max() - img.min() + 1e-5)
-            writter.add_image("gamma(train)", img, ssc.num_steps)
+            writter.add_image("gamma", img, ssc.num_steps)
         ssc.step()
 
         ssc.save_state_dict(
@@ -234,4 +244,4 @@ def main(case: str):
 
 if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
-    main("base/test4")
+    main("base")

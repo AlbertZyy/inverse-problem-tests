@@ -1,4 +1,9 @@
-
+workspace:
+  ckpts_folder: 'ckpts'
+  logs_folder: 'logs'
+  epoch_prefix: 'e'
+  ckpts_extension: '.pt'
+  step_key: 'step'
 
 base:
   data.gd_folder: data/cir3_64x64_c8/gd
@@ -11,11 +16,109 @@ base:
   model.input_dims: 2016 # = 252 * 8
   model.hidden_dims: [150, 150, 150, 150]
   model.output_dims: 4096
+  model.activation: relu
 
   optim.lr: 0.001
   optim.weight_decay: 0.0000001
 
-  scheduler.warmup_steps: 1000
-
   train.epochs: 1000
   train.batch_size: 128
+  train.loss_func: mse
+
+
+base/larger_batch:
+  train.epochs: 2000
+  train.batch_size: 256
+
+
+base/larger_batch2:
+  optim.lr: 0.008
+  train.epochs: 8000
+  train.batch_size: 1024
+
+
+base/larger_lr:
+  optim.lr: 0.1
+  train.epochs: 8000
+  train.batch_size: 1024
+
+
+base/larger_lr2:
+  optim.lr: 1.0
+  train.epochs: 8000
+  train.batch_size: 1024
+
+
+base/softplus:
+  model.activation: softplus
+  optim.lr: 1.0
+  train.epochs: 8000
+  train.batch_size: 1024
+
+
+base/tanh:
+  model.activation: tanh
+  optim.lr: 1.0
+  train.epochs: 8000
+  train.batch_size: 1024
+
+
+base/bce_loss:
+  model.activation: tanh
+  optim.lr: 1.0
+  train.epochs: 8000
+  train.batch_size: 1024
+  train.loss_func: bce
+
+base/bce_loss2:
+  model.activation: tanh
+  optim.lr: 0.1
+  train.epochs: 8000
+  train.batch_size: 1024
+  train.loss_func: bce
+
+
+base2:
+  data.gd_folder: data/cir3_64x64_c8/gd
+  data.inclusion_folder: data/cir3_64x64_c8/inclusion
+  data.train_set_start: 0
+  data.train_set_end: 10000
+  data.valid_set_start: 10000
+  data.valid_set_end: 12000
+
+  model.input_dims: 2016 # = 252 * 8
+  model.hidden_dims: [150, 150, 150, 150]
+  model.output_dims: 4096
+  model.activation: relu
+
+  optim.lr: 1.0
+  optim.weight_decay: 0.0000001
+
+  train.epochs: 100000
+  train.batch_size: 1000
+  train.loss_func: mse
+
+
+base2/deep:
+  model.hidden_dims: [147, 147, 147, 147, 147]
+
+
+base3:
+  data.gd_folder: data/cir3_64x64_c8_s26710/gd
+  data.inclusion_folder: data/cir3_64x64_c8_s26710/inclusion
+  data.train_set_start: 0
+  data.train_set_end: 10000
+  data.valid_set_start: 10000
+  data.valid_set_end: 12000
+
+  model.input_dims: 2016 # = 252 * 8
+  model.hidden_dims: [150, 150, 150, 150]
+  model.output_dims: 4096
+  model.activation: relu
+
+  optim.lr: 1.0
+  optim.weight_decay: 0.0000001
+
+  train.epochs: 100000
+  train.batch_size: 1000
+  train.loss_func: mse

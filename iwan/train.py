@@ -26,11 +26,12 @@ def check_tensor(x, name):
 class StableSinc(nn.Module):
     def forward(self, x: Tensor):
         output = torch.empty_like(x)
-        flag = torch.abs(x) < 1e-2
+        flag = torch.abs(x) < 0.2
         pix = torch.pi * x
-        x2 = pix * pix
+        x2 = pix[flag] * pix[flag]
+        x4 = x2 * x2
         # 二阶泰勒：sinc(x) ≈ 1 - (πx)^2 / 6
-        taylor = 1.0 - x2[flag] / 6.0
+        taylor = 1.0 - x2 / 6.0 + x4 / 120.0
         regular = torch.sin(pix[~flag]) / pix[~flag]
         output = output.index_put([flag], taylor)
         output = output.index_put([~flag], regular)
@@ -141,8 +142,8 @@ def main(case: str):
     gn = torch.from_numpy(
         np.load(ssc["data.gn_path"])[0, :, None] # (252, 1)
     ).to(**CONTEXT)
-    label = torch.from_numpy(np.load(ssc["data.label_path"])['label'])
-    label = label.to(**CONTEXT) * 9 + 1.0
+    # label = torch.from_numpy(np.load(ssc["data.label_path"])['label'])
+    # label = label.to(**CONTEXT) * 9 + 1.0
     gammab = 1.0
 
     NN = ssc["data.num_samples"]
@@ -244,4 +245,4 @@ def main(case: str):
 
 if __name__ == "__main__":
     # torch.autograd.set_detect_anomaly(True)
-    main("base")
+    main("simple/alpha")

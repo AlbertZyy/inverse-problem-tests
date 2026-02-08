@@ -1,0 +1,56 @@
+workspace:
+  ckpts_folder: 'ckpts'
+  logs_folder: 'logs'
+  epoch_prefix: 'e'
+  ckpts_extension: '.pt'
+  step_key: 'step'
+
+equtri2/unet100_ln01_nograd:
+equtri2/unet100_ln01_single:
+equtri2/unet100_ln01_multi:
+equtri2/unet100_ln05_nograd:
+equtri2/unet100_ln05_single:
+equtri2/unet100_ln05_multi:
+equtri2/unet100_nn_nograd:
+equtri2/unet100_nn_single:
+equtri2/unet100_nn_multi:
+
+gau2/unet100_ln01_nograd:
+gau2/unet100_ln01_single:
+gau2/unet100_ln01_multi:
+gau2/unet100_ln05_nograd:
+gau2/unet100_ln05_single:
+gau2/unet100_ln05_multi:
+gau2/unet100_nn_nograd:
+gau2/unet100_nn_single:
+gau2/unet100_nn_multi:
+
+gau3/unet100_ln01_nograd:
+gau3/unet100_ln01_single:
+gau3/unet100_ln01_multi:
+gau3/unet100_ln05_nograd:
+gau3/unet100_ln05_single:
+gau3/unet100_ln05_multi:
+gau3/unet100_nn_nograd:
+gau3/unet100_nn_single:
+gau3/unet100_nn_multi:
+
+tri1/unet100_ln01_nograd:
+tri1/unet100_ln01_single:
+tri1/unet100_ln01_multi:
+tri1/unet100_ln05_nograd:
+tri1/unet100_ln05_single:
+tri1/unet100_ln05_multi:
+tri1/unet100_nn_nograd:
+tri1/unet100_nn_single:
+tri1/unet100_nn_multi:
+
+tri2/unet100_ln01_nograd:
+tri2/unet100_ln01_single:
+tri2/unet100_ln01_multi:
+tri2/unet100_ln05_nograd:
+tri2/unet100_ln05_single:
+tri2/unet100_ln05_multi:
+tri2/unet100_nn_nograd:
+tri2/unet100_nn_single:
+tri2/unet100_nn_multi:

@@ -1,20 +1,32 @@
 # Config file for fealpy/app/eit/box_tri_generate.py
 
 head: 0
-tail: 50
+tail: 12000
 
 data:
+  gd_folder: 'gd'
+  gn_file: 'gn'
+  model: 'triangle'
+  kind: 'equ'
+  num_cir: 2
+  rlim: [0.2, 0.5]
+  major_lim: [2.0, 6.0]
+  ecc_lim: [0.5, 1.0]
   sigma: [10., 1.]
   ext: 63
-  num_cir: 3
   freq: [1, 2, 3, 4, 5, 6, 8, 16]
-  dtype: 'float64'
-  device: 'cpu'
+
+label:
+  label_folder: 'inclusion'
+  dtype: 'bool'
+  transition: 'bool'
 
 fem:
   p: 1
   q: 3
 
-seed: 2024000
-process_num: 1
-output_folder: './data/cir3_e64_64_c8_test/'
+backend: 'numpy'
+seed: 26710
+seed_offsets: [621, 928, 122, 222]
+num_process: 4
+output_folder: './lafem/data/equtri2_64x64_c8_s26710/'

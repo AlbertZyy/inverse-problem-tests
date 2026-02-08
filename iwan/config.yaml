@@ -62,6 +62,13 @@ base:
   phi_constraint: 200
   epochs: 20000
 
+base/alpha:
+  data.bdry_info_path: data/boundary_info_64x64.npz
+  data.gn_path: data/cir3_64x64_c8_s26710/gn.npy
+  data.gd_path: data/cir3_64x64_c8_s26710/gd/10653.npy
+  data.label_path: data/cir3_64x64_c8_s26710/inclusion/10653.npz
+  data.num_samples: 40000
+
 
 simple:
   data.noise: 0.0
@@ -117,3 +124,11 @@ simple/wide1:
   u.dims: [256, 128, 64, 32, 1]
   gamma.dims: [256, 128, 64, 32, 1]
   phi.dims: [256, 128, 64, 32, 1]
+
+
+simple/alpha:
+  data.bdry_info_path: data/boundary_info_64x64.npz
+  data.gn_path: data/cir3_64x64_c8_s26710/gn.npy
+  data.gd_path: data/cir3_64x64_c8_s26710/gd/10653.npy
+  data.label_path: data/cir3_64x64_c8_s26710/inclusion/10653.npz
+  data.num_samples: 40000

@@ -5,6 +5,7 @@ requires-python = ">=3.10"
 dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.2.6",
+    "pandas>=2.3.3",
     "scipy>=1.15.3",
     "sympy>=1.13.1",
     "tensorboard>=2.20.0",

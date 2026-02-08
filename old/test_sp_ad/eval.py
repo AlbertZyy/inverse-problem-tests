@@ -28,23 +28,23 @@ low_pass.s.requires_grad_(False)
 
 settings = [
 #   ('tag',       'type', 'noise', 'filter', 'ckpts_path')
-    ('nn_sng',      'sng',    0.0,  None, 'test_no_noise/ckpts'),
-    ('gn01_sng',    'sng',    0.01, None, 'test_sp_ad/ckpts'),
-    ('gn05_sng',    'sng',    0.05, None, 'test_sp_ad/ckpts'),
-    ('ln01_sng',    'sng',    0.084, low_pass, 'test_sp_ad/ckpts'),
-    ('ln05_sng',    'sng',    0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('nn_sng',      'sng',    0.0,  None, 'old/test_no_noise/ckpts'),
+    ('gn01_sng',    'sng',    0.01, None, 'old/test_sp_ad/ckpts'),
+    ('gn05_sng',    'sng',    0.05, None, 'old/test_sp_ad/ckpts'),
+    ('ln01_sng',    'sng',    0.084, low_pass, 'old/test_sp_ad/ckpts'),
+    ('ln05_sng',    'sng',    0.42, low_pass, 'old/test_sp_ad/ckpts'),
 
-    ('nn_single',   'single', 0.0,  None, 'test_no_noise/ckpts'),
-    ('gn01_single', 'single', 0.01, None, 'test_sp_ad/ckpts'),
-    ('gn05_single', 'single', 0.05, None, 'test_sp_ad/ckpts'),
-    ('ln01_single', 'single', 0.084, low_pass, 'test_sp_ad/ckpts'),
-    ('ln05_single', 'single', 0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('nn_single',   'single', 0.0,  None, 'old/test_no_noise/ckpts'),
+    ('gn01_single', 'single', 0.01, None, 'old/test_sp_ad/ckpts'),
+    ('gn05_single', 'single', 0.05, None, 'old/test_sp_ad/ckpts'),
+    ('ln01_single', 'single', 0.084, low_pass, 'old/test_sp_ad/ckpts'),
+    ('ln05_single', 'single', 0.42, low_pass, 'old/test_sp_ad/ckpts'),
 
-    ('nn_multi',    '',       0.0,  None, 'test_no_noise/ckpts'),
-    ('gn01_multi',  '',       0.01, None, 'test_sp_ad/ckpts'),
-    ('gn05_multi',  '',       0.05, None, 'test_sp_ad/ckpts'),
-    ('ln01_multi',  '',       0.084, low_pass, 'test_sp_ad/ckpts'),
-    ('ln05_multi',  '',       0.42, low_pass, 'test_sp_ad/ckpts'),
+    ('nn_multi',    '',       0.0,  None, 'old/test_no_noise/ckpts'),
+    ('gn01_multi',  '',       0.01, None, 'old/test_sp_ad/ckpts'),
+    ('gn05_multi',  '',       0.05, None, 'old/test_sp_ad/ckpts'),
+    ('ln01_multi',  '',       0.084, low_pass, 'old/test_sp_ad/ckpts'),
+    ('ln05_multi',  '',       0.42, low_pass, 'old/test_sp_ad/ckpts'),
 ]
 
 validation_set = TPZDataset('./data/gdgn_cir3_e64_64_c8_validate/', 2000,
@@ -72,11 +72,11 @@ def validate(model: Module,
             x = x.clone()
             label = label.to(dtype=torch.float32)
             label = transform(label) if transform else label
-            noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
-            if noise_filter:
-                noise = noise_filter(noise)
-            noise = x[:, :, 0, :] * noise
-            x[:, :, 0, :] += noise
+            # noise = torch.randn_like(x[:, :, 0, :]) * noise_coef
+            # if noise_filter:
+            #     noise = noise_filter(noise)
+            # noise = x[:, :, 0, :] * noise
+            # x[:, :, 0, :] += noise
             y_pred = model(x).squeeze(1)
             y_pred = transform(y_pred) if transform else y_pred
             loss += loss_fn(y_pred, label).detach().cpu().item()
@@ -102,12 +102,13 @@ for tag, type_, noise_coef, noise_filter, ckpts_path in settings:
 
     cross_entropy_loss = validate(
         model, validation_set.loader(500), cross_entropy, noise_coef,
-        noise_filter, transform=CenterCrop(32), repeat=REPEAT)
+        noise_filter, transform=None, repeat=REPEAT)
     print(f'Validation loss for {name}: {cross_entropy_loss}')
     result_string += f"{cross_entropy_loss}\n"
     result_rounded += f"{round(cross_entropy_loss, 5)}\n"
 
-with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
+# CenterCrop(32)
+with open(os.path.join(save_dir, 'result_cir3.txt'), 'w') as f:
     f.write(result_string)
     f.write('\n')
     f.write(result_rounded)

@@ -6,7 +6,7 @@ from functools import reduce
 
 import numpy as np
 import torch
-from torch.nn.functional import binary_cross_entropy
+from torch.nn.functional import binary_cross_entropy_with_logits
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.gridspec import GridSpec
@@ -46,25 +46,23 @@ settings = [
 titles = [
 #   ('row', 'col', 'title', 'rotation')
     (0, 1,  'No Noise',        0),
-    (0, 2,  'Gaussian 1%',     0),
-    (0, 3,  'Gaussian 5%',     0),
-    (0, 4,  'Low-freq 1%',     0),
-    (0, 5,  'Low-freq 5%',     0),
+    (0, 2,  '1% Noise',     0),
+    (0, 3,  '5% Noise',     0),
     (1, 0,  '$\gamma = 0$',    90),
     (2, 0, 'Single',          90),
     (3, 0, 'Multi',           90)
 ]
 
-LABEL_POS = (1, 6)
+LABEL_POS = (4, 1)
 
-figure_matrix = [4, 7]
-wr = [0.15, 1, 1, 1, 1, 1, 1]
-hr = [0.15, 1, 1, 1]
-figure_size = (24, 12)
+figure_matrix = [5, 4]
+wr = [0.15, 1, 1, 1]
+hr = [0.15, 1, 1, 1, 1]
+figure_size = (12, 16)
 num_axes = reduce(lambda x, y: x * y, figure_matrix)
-gd_set = NPYDataset("lafem/data/cir3_e64_64_c8/gd", [str(i) for i in range(12000)])
+gd_set = NPYDataset("lafem/data/cir3_e64_64_c8/gd", [str(i) for i in range(10000, 12000)])
 gn = torch.from_numpy(np.load('lafem/data/cir3_e64_64_c8/gn.npy')).to(device)
-label_set = NPZDataset("lafem/data/cir3_e64_64_c8/inclusion", [str(i) for i in range(12000)])
+label_set = NPZDataset("lafem/data/cir3_e64_64_c8/inclusion", [str(i) for i in range(10000, 12000)])
 
 
 save_dir = 'lafem/figure/'
@@ -72,8 +70,8 @@ use_noise_filter = True
 os.makedirs(save_dir, exist_ok=True)
 
 ### Validation and Visualization Scripts ###
-
-ID = [10001, 10048, 10061, 10098, 10653]
+# 0, 25, 30, 43, 44, 53, 67, 83, 88, 94, 96
+ID = [10653, 10001]
 figs = {i: plt.figure(f"Data{i}", figsize=figure_size) for i in ID}
 gs = GridSpec(figure_matrix[0], figure_matrix[1],
               width_ratios=wr, height_ratios=hr)
@@ -81,6 +79,8 @@ gs = GridSpec(figure_matrix[0], figure_matrix[1],
 x = np.linspace(-1, 1, 64)
 y = np.linspace(-1, 1, 64)
 X, Y = np.meshgrid(x, y, indexing='ij')
+central_area = (X>-0.5) & (Y>-0.5) & (X<0.5) & (Y<0.5)
+central_area = central_area[None, :, :]
 NOISE = torch.randn((20, 8, 252), dtype=torch.float64) # (N, channel, dofs)
 
 for pos_row, pos_col, tag, type_, noise_coef, noise_filter, ckpts_path in settings:
@@ -96,24 +96,26 @@ for pos_row, pos_col, tag, type_, noise_coef, noise_filter, ckpts_path in settin
 
     # for each sample/figure
     for i in ID:
-        if noise_filter:
-            noise_ = noise_filter(NOISE * noise_coef)
-        else:
-            noise_ = NOISE * noise_coef
+        # if noise_filter:
+        #     noise_ = noise_filter(NOISE * noise_coef)
+        # else:
+        #     noise_ = NOISE * noise_coef
 
         fig = figs[i]
         gd = gd_set[i].to(device)
-        data = torch.empty([20, 8, 2, 252], dtype=gd.dtype, device=gd.device) # new memory
-        torch.multiply(noise_, gd[None, ...], out=data[:, :, 0, :])
-        data[:, :, 0, :] += gd[None, ...]
-        data[:, :, 1, :] = gn[None, ...]
+        # data = torch.empty([20, 8, 2, 252], dtype=gd.dtype, device=gd.device) # new memory
+        # torch.multiply(noise_, gd[None, ...], out=data[:, :, 0, :])
+        # data[:, :, 0, :] = gd[None, ...]
+        # data[:, :, 1, :] = gn[None, ...]
+        data = torch.stack([gd, gn], dim=1)[None, ...]
         label = label_set[i][-1].to(device)
 
-        pred = model(data).mean(0)
+        pred = model(data).squeeze(0)
         label = label.reshape(pred.shape).to(dtype=pred.dtype)
-        loss = binary_cross_entropy(pred, label).item()
+        loss = binary_cross_entropy_with_logits(pred[central_area], label[central_area]).item()
 
         axes = fig.add_subplot(gs[pos_row, pos_col])
+        pred = pred.sigmoid_()
         axes.pcolormesh(X, Y, pred.detach().cpu().reshape(64, 64), cmap='jet', vmin=0, vmax=1)
 
         file_ = np.load(f'lafem/data/cir3_e64_64_c8/inclusion/{i}.npz')
@@ -133,7 +135,7 @@ for i in ID:
         axes.axis('off')
 
         label = label_set[i][-1]
-        axes = fig.add_subplot(gs[*LABEL_POS])
+        axes = fig.add_subplot(gs[LABEL_POS])
         axes.pcolormesh(X, Y, label.reshape(64, 64), cmap='jet', vmin=0, vmax=1)
         axes.set_title('Inclusion')
 

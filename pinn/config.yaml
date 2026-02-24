@@ -1,0 +1,26 @@
+workspace:
+  ckpts_folder: 'ckpts'
+  logs_folder: 'logs'
+  epoch_prefix: 'e'
+  ckpts_extension: '.pt'
+  step_key: 'step'
+
+
+base:
+  data.gd_folder: pinn/data/cir3_64x64_c8_s26710/gd
+  data.train_set_start: 0
+  data.train_set_end: 10000
+  data.valid_set_start: 10000
+  data.valid_set_end: 12000
+  model.channel: 1
+  model.bdry_nodes: 252
+  model.all_nodes: 4096
+  model.hidden_dims: 102
+
+  optim.lr: 0.001
+  optim.momentum: 0.9
+
+  scheduler.warmup_steps: 1000
+
+  train.epochs: 1000
+  train.batch_size: 128

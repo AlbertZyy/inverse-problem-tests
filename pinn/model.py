@@ -22,9 +22,10 @@ class AnnEIT(nn.Module):
     ACTIVATE_MAP = {
         "relu": torch.relu,
         "tanh": torch.tanh,
-        "softplus": F.softplus
+        "softplus": F.softplus,
+        "leaky_relu": F.leaky_relu
     }
-    def __init__(self, input_dims: int, hidden_dims: list[int], output_dims: int, activation: str = "relu"):
+    def __init__(self, input_dims: int, hidden_dims: list[int], output_dims: int, activation: str = "leaky_relu"):
         super().__init__()
         self.layer_norm = nn.LayerNorm(input_dims, elementwise_affine=False)
         self.input_layer = nn.Linear(input_dims, hidden_dims[0])
@@ -53,12 +54,19 @@ class PINNEIT(nn.Module):
         self.bdry_nodes = bdry_nodes
         self.all_nodes = all_nodes
         self.conv = nn.Conv1d(channel, channel, kernel_size=3, padding=1, padding_mode="circular")
+        self.bn = nn.BatchNorm1d(channel)
+        self.conv2 = nn.Conv1d(channel, channel, kernel_size=3, padding=1, padding_mode="circular")
+        self.bn2 = nn.BatchNorm1d(channel)
         self.sigma_branch = AnnEIT(bdry_nodes*channel, [HD, HD, HD], all_nodes)
         self.bdry_potential_branch = AnnEIT(bdry_nodes*channel, [HD, HD], bdry_nodes*channel)
         self.all_potential_branch = AnnEIT(bdry_nodes*channel, [HD, HD], all_nodes*channel)
 
     def forward(self, x: Tensor): # (N, channel, bdry nodes)
-        backbone = self.conv(x).reshape(x.shape[0], -1) # (N, channel*bdry nodes)
+        x = self.bn(self.conv(x))
+        x = F.leaky_relu(x)
+        x = self.bn2(self.conv2(x)) # (N, channel, bdry nodes)
+        x = F.leaky_relu(x)
+        backbone = x.reshape(x.shape[0], -1) # (N, channel*bdry nodes)
         sigma = self.sigma_branch(backbone)
         bdry_potential = self.bdry_potential_branch(backbone).reshape(x.shape[0], self.channel, self.bdry_nodes) # (N, bdry nodes)
         all_potential = self.all_potential_branch(backbone).reshape(x.shape[0], self.channel, self.all_nodes) # (N, all nodes)
@@ -75,7 +83,9 @@ def mean_norm1(data: Tensor):
 class MixedLoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.betas_initial = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32)
+        self.betas_initial = nn.Buffer(
+            torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32)
+        )
         self.betas = nn.Parameter(
             torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32)
         )
@@ -104,7 +114,10 @@ class MixedLoss(nn.Module):
         compatibility_loss = mean_norm1(grad_bdry_potential[0])
         betas = torch.exp(self.betas)
 
-        return sigma_bce + betas[0] * bdry_potential_n1 \
-            + betas[1] * all_potential_n1 \
-            + betas[2] * compatibility_loss \
-            + mean_norm1_error(betas, self.betas_initial)
+        return (
+            sigma_bce,
+            betas[0] * bdry_potential_n1,
+            betas[1] * all_potential_n1,
+            betas[2] * compatibility_loss,
+            mean_norm1_error(self.betas, self.betas_initial)
+        )

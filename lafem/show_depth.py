@@ -59,7 +59,7 @@ print(dataset[0])
 loader = DataLoader(dataset, batch_size=100,
                     shuffle=True, num_workers=0, pin_memory=True)
 
-REPEAT = 1
+REPEAT = 3
 save_dir = 'lafem/'
 use_noise_filter = True
 

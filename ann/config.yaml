@@ -6,8 +6,8 @@ workspace:
   step_key: 'step'
 
 base:
-  data.gd_folder: data/cir3_64x64_c8/gd
-  data.inclusion_folder: data/cir3_64x64_c8/inclusion
+  data.gd_folder: data/cir3_e64_64_c8/gd
+  data.inclusion_folder: data/cir3_e64_64_c8/inclusion
   data.train_set_start: 0
   data.train_set_end: 7154
   data.valid_set_start: 7154
@@ -79,8 +79,8 @@ base/bce_loss2:
 
 
 base2:
-  data.gd_folder: data/cir3_64x64_c8/gd
-  data.inclusion_folder: data/cir3_64x64_c8/inclusion
+  data.gd_folder: data/cir3_e64_64_c8/gd
+  data.inclusion_folder: data/cir3_e64_64_c8/inclusion
   data.train_set_start: 0
   data.train_set_end: 10000
   data.valid_set_start: 10000
@@ -103,9 +103,16 @@ base2/deep:
   model.hidden_dims: [147, 147, 147, 147, 147]
 
 
+base2/bce:
+  model.activation: leaky_relu
+  train.epochs: 15000
+  train.batch_size: 1000
+  train.loss_func: bce
+
+
 base3:
-  data.gd_folder: data/cir3_64x64_c8_s26710/gd
-  data.inclusion_folder: data/cir3_64x64_c8_s26710/inclusion
+  data.gd_folder: data/cir3_e64_64_c8_s26710/gd
+  data.inclusion_folder: data/cir3_e64_64_c8_s26710/inclusion
   data.train_set_start: 0
   data.train_set_end: 10000
   data.valid_set_start: 10000

@@ -14,7 +14,8 @@ class AnnEIT(nn.Module):
     ACTIVATE_MAP = {
         "relu": torch.relu,
         "tanh": torch.tanh,
-        "softplus": F.softplus
+        "softplus": F.softplus,
+        "leaky_relu": F.leaky_relu
     }
     def __init__(self, input_dims: int, hidden_dims: list[int], output_dims: int, activation: str = "relu"):
         super().__init__()

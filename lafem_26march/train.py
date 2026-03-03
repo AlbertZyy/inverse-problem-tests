@@ -18,7 +18,6 @@ from tqdm import tqdm, trange
 from lafemeit.model import build_eit_model, FractionalDoF
 from lafemeit.utils import NPYDataset, NPZDataset, MemoryDataset
 
-
 ### parse args
 
 COLOR = {
@@ -58,7 +57,8 @@ print(f"  - learning rate: {lr}")
 print(f"  - momentum: {momentum}")
 print(f"  - weight decay: {weight_decay}", end='\n\n')
 
-def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: int, gpu_id: int, **kwargs):
+
+def main(noise: float, use_noise_filter: bool, tag: str, type_: str, gpu_id: int, **kwargs):
     device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
     data_conf = config['data']
 
@@ -120,14 +120,13 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
     model, MODEL_NAME = build_eit_model(
         name = 'unet100',
         ext = 63,
-        n_channel = n_channel,
+        n_channel = 8,
         tag = tag,
         fractype = type_,
         eigen_file = "data/laplace_beltrami_64x64.npz",
-        ckpts_path = "num_pairs/ckpts",
+        ckpts_path = "lafem_26march/ckpts",
         device = device
     )
-    MODEL_NAME += "_c" + str(n_channel)
     iter_per_epoch, remander = divmod(len(train_data_dataset), data_conf['train_batch_size'])
     assert remander == 0
 
@@ -169,14 +168,11 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
 
-    torch.manual_seed(26710)
-
     for epoch in trange(0, n_epoch, desc=f'Device: {gpu_id}', ascii=True,
                         unit='epoch', leave=False, position=gpu_id*2,
                         colour=COLOR.get(gpu_id, 'white')):
         ### train
         model.train()
-        # loss_func.train()
         step = 0
         sampler = RandomSampler(train_data_dataset)
         batch_sampler = BatchSampler(sampler, batch_size=data_conf['train_batch_size'], drop_last=False)
@@ -184,8 +180,8 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
         for indices in tqdm(batch_sampler,
                             desc=f'  Epoch {epoch + 1}/{n_epoch}', ascii=True,
                             unit='batch', leave=False, position=gpu_id*2+1):
-            gd = train_data_dataset[indices][:, :n_channel, :] # (N, CH, bddof)
-            gn = gn_origin[None, :n_channel, :].broadcast_to(gd.shape)
+            gd = train_data_dataset[indices]
+            gn = gn_origin[None, ...].broadcast_to(gd.shape)
             gdgn = torch.stack([gd, gn], dim=-2) # (N, CH, 2, bddof)
             optim.zero_grad()
 
@@ -198,7 +194,6 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
             y_out = model(gdgn).squeeze(1) # (N, 1, Nx, Ny)
             label = train_label_dataset[indices].reshape(y_out.shape)
             loss = binary_cross_entropy(y_out, label.to(dtype=torch.float32))
-            # loss = loss_func(y_out, label.to(dtype=torch.float32))
             loss.backward()
             optim.step()
             step += 1
@@ -208,7 +203,7 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
 
         if type_ != 'nograd':
             if type_ != 'single':
-                for i in range(0, n_channel):
+                for i in range(0, 8):
                     writer_1.add_scalar(f'gamma{i}', model.df_solver.bc_filter.gamma[i].item(),
                                         iter_head + (epoch+1)*iter_per_epoch)
             else:
@@ -220,7 +215,6 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
 
         ### validate
         model.eval()
-        # loss_func.eval()
         sampler = RandomSampler(validate_data_dataset)
         batch_sampler = BatchSampler(sampler, batch_size=data_conf['validate_batch_size'], drop_last=False)
         losses = []
@@ -229,8 +223,8 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
             for indices in tqdm(batch_sampler,
                             desc=f'Epoch {epoch + 1}/{n_epoch}', ascii=True,
                             unit='batch', leave=False, position=gpu_id*2+1):
-                gd = validate_data_dataset[indices][:, :n_channel, :] # (N, CH, bddof)
-                gn = gn_origin[None, :n_channel, :].broadcast_to(gd.shape)
+                gd = validate_data_dataset[indices]
+                gn = gn_origin[None, ...].broadcast_to(gd.shape)
                 gdgn = torch.stack([gd, gn], dim=-2) # (N, CH, 2, bddof)
 
                 noise_tensor = torch.randn_like(gdgn[:, :, 0, :]) * noise
@@ -253,4 +247,4 @@ def main(noise: float, use_noise_filter: bool, tag: str, type_: str, n_channel: 
 
 if __name__ == '__main__':
     works.run(main)
-    # main(noise=0.0, use_noise_filter=False, tag='nn_multi', type_='multi', n_channel=4, gpu_id=0)
+    # main(noise=0.0, use_noise_filter=False, tag='nn_multi', type_='multi', gpu_id=0)

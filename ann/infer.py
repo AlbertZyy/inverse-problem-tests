@@ -34,12 +34,12 @@ def main(case: str, data_id: int):
     model.eval()
 
     validate_data_dataset = NPYDataset(
-        ssc["data.gd_folder"],
+        "lafem/data/cir3_e64_64_c8/gd",
         names=[str(i) for i in range(0, 12000)],
     )
 
     validate_label_dataset = NPZDataset(
-        ssc["data.inclusion_folder"],
+        "lafem/data/cir3_e64_64_c8/inclusion",
         names = [str(i) for i in range(0, 12000)],
         channel_keys = []
     )
@@ -69,4 +69,4 @@ def main(case: str, data_id: int):
 
 
 if __name__ == "__main__":
-    main("base2/bce", 10653)
+    main("final", 10001)

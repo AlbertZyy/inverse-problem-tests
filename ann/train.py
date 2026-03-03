@@ -174,5 +174,5 @@ def main(case: str):
 
 
 if __name__ == '__main__':
-    main("base3")
+    main("final")
     # print(ccw_index(252, None))

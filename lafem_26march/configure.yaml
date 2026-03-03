@@ -1,0 +1,97 @@
+
+data:
+  train_set_location: "data/cir3_64x64_c8_s26710/"
+  train_set_start: 0
+  train_set_end: 10000
+  train_batch_size: 500
+
+  validate_set_location: "data/cir3_64x64_c8_s26710/"
+  validate_set_start: 10000
+  validate_set_end: 12000
+  validate_batch_size: 500
+
+
+iter_head: 0
+epochs: 1500
+
+lr: 0.001
+weight_decay: 0.000000001
+momentum: 0.9
+
+log_dir: "lafem_26march/logs/"
+save: True
+checkpoint_dir: "lafem_26march/ckpts/"
+
+
+defaults:
+  blank: None
+
+
+task1:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_multi'
+  type_: 'multi'
+
+
+task2:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_single'
+  type_: 'single'
+
+
+task3:
+  noise: 0.0
+  use_noise_filter: False
+  tag: 'nn_nograd'
+  type_: 'nograd'
+
+
+task4:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_multi'
+  type_: 'multi'
+
+
+task5:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_single'
+  type_: 'single'
+
+
+task6:
+  noise: 0.084
+  use_noise_filter: True
+  tag: 'ln01_nograd'
+  type_: 'nograd'
+
+
+task7:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_multi'
+  type_: 'multi'
+
+
+task8:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_single'
+  type_: 'single'
+
+
+task9:
+  noise: 0.42
+  use_noise_filter: True
+  tag: 'ln05_nograd'
+  type_: 'nograd'
+
+
+argpools:
+  gpu_id: [0, 1, 2, 3, 4, 5]
+
+
+pool_size: 6

@@ -142,6 +142,7 @@ logs/
 checkpoints/
 ckpts/
 ckpts2/
+data_deprecated/
 data/
 *.json
 

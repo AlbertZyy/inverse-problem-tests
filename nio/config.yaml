@@ -1,0 +1,42 @@
+workspace:
+  ckpts_folder: 'ckpts'
+  logs_folder: 'logs'
+  epoch_prefix: 'e'
+  ckpts_extension: '.pt'
+  step_key: 'step'
+
+
+base:
+  deeponet.function_input_dim: 252
+  deeponet.geometry_dim: 2
+  deeponet.num_basis: 128
+  deeponet.branch_hidden_dim: 128
+  deeponet.branch_num_hidden_layers: 4
+  deeponet.trunk_hidden_dim: 128
+  deeponet.trunk_num_hidden_layers: 4
+
+  fno2d.in_channels: 32
+  fno2d.out_channels: 1
+  fno2d.modes1: 16
+  fno2d.modes2: 16
+  fno2d.width: 20
+  fno2d.depth: 4
+
+  nio.d_v: 32
+  nio.geometry_dim: 2
+
+  data.width: 64
+  data.height: 64
+  data.noise_std: 0.0
+  data.train_set_location: lafem/data/cir3_e64_64_c8
+  data.train_set_start: 0
+  data.train_set_end: 1000
+  data.val_set_location: lafem/data/cir3_e64_64_c8
+  data.val_set_start: 1000
+  data.val_set_end: 1200
+
+  optim.lr: 0.001
+  optim.weight_decay: 0.000001
+
+  training.num_epochs: 1500
+  training.batch_size: 10
